@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-agent-llm-company-system"
+version = "0.1.0"
+description = "Autonomous Multi-Agent System - AI agents that collaborate to discover and solve problems."
+requires-python = ">=3.10"
+dependencies = [
+    "ollama>=0.4.0",
+    "rich>=13.0.0",
+    "aiohttp>=3.9.0",
+    "pyyaml>=6.0",
+    "beautifulsoup4>=4.12.0",
+    "python-dotenv>=1.0.0",
+    "scikit-learn>=1.4.0",
+]
+
+[project.scripts]
+multi-agent-llm-company-system = "main:main"
+
+[tool.setuptools.packages.find]
+include = ["agents*", "orchestrator*", "config*", "memory*", "tools*", "ui*", "utils*", "research*", "collaboration*", "templates*", "company*"]
+
+[tool.setuptools]
+py-modules = ["main", "interactive_mode"]

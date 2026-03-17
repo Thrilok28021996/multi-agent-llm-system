@@ -1,0 +1,15 @@
+{
+  "agent_name": "Developer",
+  "learned_patterns": {
+    "successful_approaches": [],
+    "failed_approaches": [],
+    "preferences": {},
+    "frequently_used_tools": {
+      "write_file": {
+        "total_uses": 57,
+        "successes": 49
+      }
+    }
+  },
+  "experiences": []
+}

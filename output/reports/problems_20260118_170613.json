@@ -1,0 +1,516 @@
+[
+  {
+    "id": "PROB-20260118-0001",
+    "description": "Users are frustrated with the reliability and accuracy of AI coding assistants and tools.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Software developers, programmers, and tech professionals who rely on AI for coding assistance.",
+    "evidence": [
+      "\"Newer AI Coding Assistants Are Failing in Insidious Ways\" - This post suggests that AI tools are failing to deliver accurate results, causing frustration among users."
+    ],
+    "sources": [
+      "reddit/r/programming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "AI",
+      "coding assistants",
+      "failures",
+      "insidious ways",
+      "accuracy."
+    ],
+    "potential_solution_ideas": [
+      "Developing more robust and reliable AI algorithms for coding assistance, implementing quality control measures to ensure the accuracy of AI-generated code, providing transparency about the limitations and potential errors of AI tools."
+    ],
+    "discovered_at": "2026-01-18T17:03:50.448078",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0002",
+    "description": "Users are dissatisfied with the current state of Large Language Models (LLMs) due to their unreliability and frequent hallucinations.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Developers, researchers, and anyone using LLMs for various tasks.",
+    "evidence": [
+      "\"LLMs are a 400-year-long confidence trick\" - This post questions the reliability of LLMs and suggests that they are not as reliable as their creators claim them to be."
+    ],
+    "sources": [
+      "reddit/r/programming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Large Language Models",
+      "unreliability",
+      "hallucinations",
+      "confidence trick."
+    ],
+    "potential_solution_ideas": [
+      "Improving the accuracy and reliability of LLMs through better training data, implementing checks and balances to prevent hallucinations, providing transparency about the limitations and potential errors of LLMs."
+    ],
+    "discovered_at": "2026-01-18T17:03:50.448196",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0003",
+    "description": "Users are struggling with the complexity and manual nature of certain coding tests, such as the 15-second coding test mentioned in one post.",
+    "severity": "medium",
+    "frequency": "occasional",
+    "target_users": "Job applicants for programming positions who are required to complete coding tests as part of the application process.",
+    "evidence": [
+      "\"Here is the 15 sec coding test to instantly filter out 50% of unqualified applicants by JOSE ZARAZUA\" - This post suggests a very short and complex coding test that may be difficult for some applicants to complete within the given time frame."
+    ],
+    "sources": [
+      "reddit/r/programming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "coding tests",
+      "complexity",
+      "manual process",
+      "job applications."
+    ],
+    "potential_solution_ideas": [
+      "Simplifying coding tests to make them more accessible and less time-consuming for applicants, providing clear instructions and guidelines for test completion, offering alternative methods of assessment such as interviews or portfolio reviews."
+    ],
+    "discovered_at": "2026-01-18T17:03:50.448229",
+    "validation_status": "unvalidated",
+    "score": 4.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0004",
+    "description": "Users are frustrated with the lack of recognition for key contributors in the development of important technologies, such as James D. Johnston who co-created MP3 but was erased from history.",
+    "severity": "low",
+    "frequency": "rare",
+    "target_users": "Historians, tech enthusiasts, and anyone interested in the origins of important technological advancements.",
+    "evidence": [
+      "\"Ken Thompson rewrote his code in real-time. A federal court said he co-created MP3. So why has no one heard of James D. Johnston?\" - This post highlights the erasure of James D. Johnston from history despite his significant contributions to the development of MP3."
+    ],
+    "sources": [
+      "reddit/r/programming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "technological advancements",
+      "recognition",
+      "contributors",
+      "erased from history."
+    ],
+    "potential_solution_ideas": [
+      "Encouraging proper attribution and recognition for key contributors in the development of important technologies, promoting historical research and education about the origins of technological advancements."
+    ],
+    "discovered_at": "2026-01-18T17:03:50.448262",
+    "validation_status": "unvalidated",
+    "score": 2.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0005",
+    "description": "Users are frustrated with the lengthy and unpredictable nature of software development projects due to Parkinson's Law and Hofstadter's Law.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Project managers, developers, and anyone involved in software development projects.",
+    "evidence": [
+      "\"Your estimates take longer than expected, even when you account for them taking longer \u2014 Parkinson's & Hofstadter's Laws\" - This post highlights the challenges of predicting the duration of software development projects due to these laws."
+    ],
+    "sources": [
+      "reddit/r/programming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "software development",
+      "project management",
+      "Parkinson's Law",
+      "Hofstadter's Law",
+      "unpredictability."
+    ],
+    "potential_solution_ideas": [
+      "Developing more accurate project estimation methodologies, implementing agile development practices to allow for greater flexibility and adaptability, promoting transparency and communication between team members and stakeholders."
+    ],
+    "discovered_at": "2026-01-18T17:03:50.448296",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0006",
+    "description": "Contributors disregarding contribution guidelines in open-source projects, leading to rewritten PRs and implementation of unrelated features.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Open-source project maintainers, contributors",
+    "evidence": [
+      "\"What was most annoying was that there was no regard to the contribution guidelines.\""
+    ],
+    "sources": [
+      "reddit/r/webdev"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Contribution guidelines",
+      "open-source",
+      "PR"
+    ],
+    "potential_solution_ideas": [
+      "Implement stricter enforcement of contribution guidelines, provide clearer guidance for contributors, or develop a tool to automatically check PRs against guidelines."
+    ],
+    "discovered_at": "2026-01-18T17:04:31.138409",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0007",
+    "description": "Clients taking too long to respond or make decisions, causing delays and potential loss of business.",
+    "severity": "medium",
+    "frequency": "occasional",
+    "target_users": "Freelance developers, web development companies",
+    "evidence": [
+      "\"I delivered the estimate recently and he didn't answer for 2 days...\""
+    ],
+    "sources": [
+      "reddit/r/webdev"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Client response time",
+      "project delays",
+      "freelance work"
+    ],
+    "potential_solution_ideas": [
+      "Implement follow-up systems to remind clients about outstanding tasks or decisions, provide clearer communication expectations upfront."
+    ],
+    "discovered_at": "2026-01-18T17:04:31.138432",
+    "validation_status": "unvalidated",
+    "score": 4.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0008",
+    "description": "Frustration with the use of high-level CSS frameworks, perceived as undoing solutions to problems that existed before and becoming a problem again.",
+    "severity": "high",
+    "frequency": "common",
+    "target_users": "Web developers, designers",
+    "evidence": [
+      "\"CSS was created to separate style from object instantiation (in this case, the objects are HTML tags). Then, these frameworks combine them again into one entity...\""
+    ],
+    "sources": [
+      "reddit/r/webdev"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "CSS frameworks",
+      "web development",
+      "design"
+    ],
+    "potential_solution_ideas": [
+      "Educate developers on the benefits and appropriate use of high-level CSS frameworks, provide alternatives for those who prefer a more minimalistic approach."
+    ],
+    "discovered_at": "2026-01-18T17:04:31.138442",
+    "validation_status": "unvalidated",
+    "score": 6.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0009",
+    "description": "Burnout among front-end developers due to long hours, stress, and lack of job satisfaction.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Front-end developers",
+    "evidence": [
+      "\"I'm burnt out from this job, I'm burnt out from this career itself...\""
+    ],
+    "sources": [
+      "reddit/r/webdev"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Burnout",
+      "front-end development",
+      "job satisfaction"
+    ],
+    "potential_solution_ideas": [
+      "Implement work-life balance policies, provide opportunities for professional growth and development, offer mental health resources."
+    ],
+    "discovered_at": "2026-01-18T17:04:31.138450",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0010",
+    "description": "Stack Overflow struggling to adapt to changing times and competition from other platforms or AI solutions.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Stack Overflow users, developers",
+    "evidence": [
+      "\"But we all know times have changed.\""
+    ],
+    "sources": [
+      "reddit/r/webdev"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Stack Overflow",
+      "development community",
+      "competition"
+    ],
+    "potential_solution_ideas": [
+      "Pivot to a new business model, integrate AI solutions, improve user experience and engagement."
+    ],
+    "discovered_at": "2026-01-18T17:04:31.138458",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0011",
+    "description": "Users are not fully utilizing Git and are unaware of its advanced features, leading to inefficient workflows and potential issues.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Beginner to intermediate programmers",
+    "evidence": [
+      "\"I've been doing git add . then git commit for literally everything.\"",
+      "\"Today someone at work did git add -p and walked through each change interactively and my mind exploded.\""
+    ],
+    "sources": [
+      "reddit/r/learnprogramming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Git",
+      "workflow",
+      "efficiency",
+      "utilization"
+    ],
+    "potential_solution_ideas": [
+      "Educational content or tools that explain advanced Git features and their benefits, or a Git GUI with interactive tutorials."
+    ],
+    "discovered_at": "2026-01-18T17:05:27.239550",
+    "validation_status": "unvalidated",
+    "score": 6.3,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0012",
+    "description": "Over-reliance on AI for learning programming leads to shallow understanding and lack of problem-solving skills.",
+    "severity": "medium",
+    "frequency": "occasional",
+    "target_users": "Beginner programmers",
+    "evidence": [
+      "\"I\u2019m a senior developer working currently as a Team Leader for big corporation. We are currently recruiting and amount of junior, mid and sometimes even senior developers, who cannot write a simple code by their own without using AI is absolutely ridiculous.\""
+    ],
+    "sources": [
+      "reddit/r/learnprogramming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "AI",
+      "learning",
+      "shallow understanding",
+      "problem-solving"
+    ],
+    "potential_solution_ideas": [
+      "Encouraging self-directed learning and problem-solving, or limiting the use of AI for specific tasks during the learning process."
+    ],
+    "discovered_at": "2026-01-18T17:05:27.239569",
+    "validation_status": "unvalidated",
+    "score": 4.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0013",
+    "description": "Beginners believe that learning to code is about memorizing syntax and finishing courses in a certain order, leading to frustration and lack of progress.",
+    "severity": "medium",
+    "frequency": "occasional",
+    "target_users": "Beginner programmers",
+    "evidence": [
+      "\"Most beginners think learning to code is about memorizing syntax or finishing courses in the right order.\"",
+      "\"He grabbed a paid Python course and treated it like school, watch video copy solution and move on. He felt productive every day, but the moment a task changed even a little, he froze like nothing really stuck\""
+    ],
+    "sources": [
+      "reddit/r/learnprogramming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Beginner",
+      "learning",
+      "syntax",
+      "progress"
+    ],
+    "potential_solution_ideas": [
+      "Emphasizing the importance of problem-solving and practical application over rote memorization, or providing more hands-on, project-based learning opportunities."
+    ],
+    "discovered_at": "2026-01-18T17:05:27.239580",
+    "validation_status": "unvalidated",
+    "score": 5.3,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0014",
+    "description": "Inexperienced developers struggle to meet deadlines and feel overwhelmed by their slow progress compared to their peers.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Junior developers",
+    "evidence": [
+      "\"I\u2019m 25 and I started working as a software developer about 9 months ago (C#, .NET, TypeScript/JavaScript, HTML and CSS). Here is my problem: I don\u2019t really believe in myself. Almost every time I get a task, my team lead says something like: \u2018Here is a small task, this should take you 1\u20132 days.\u2019 But in the end, it usually takes me 5\u20136 days to finish.\""
+    ],
+    "sources": [
+      "reddit/r/learnprogramming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Junior developer",
+      "deadlines",
+      "progress",
+      "self-doubt"
+    ],
+    "potential_solution_ideas": [
+      "Providing resources for time management and productivity, or mentorship programs that offer guidance and support."
+    ],
+    "discovered_at": "2026-01-18T17:05:27.239597",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0015",
+    "description": "Reading code can be difficult and requires a significant amount of skill, leading to frustration for developers.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Developers at all levels",
+    "evidence": [
+      "\"Reading code of any meaningful size is extremely difficult and requires a lot of skill, doesn\u2019t it?\"",
+      "\"Personally, I clearly find reading code harder than writing it.\""
+    ],
+    "sources": [
+      "reddit/r/learnprogramming"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "Code reading",
+      "difficulty",
+      "skill"
+    ],
+    "potential_solution_ideas": [
+      "Tools or resources that help developers understand and navigate complex codebases more easily, or educational content focused on improving code reading skills."
+    ],
+    "discovered_at": "2026-01-18T17:05:27.239606",
+    "validation_status": "unvalidated",
+    "score": 6.3,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0016",
+    "description": "Users are struggling with flat RAG pipelines failing to retrieve related articles together despite clear connections through references, definitions, or clauses in regulation-heavy documents.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Users working with regulation-heavy documents",
+    "evidence": [
+      "\"Flat RAG pipelines often fail to retrieve related articles together, even when they are clearly connected through references, definitions, or clauses.\""
+    ],
+    "sources": [
+      "hackernews"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "regulation-heavy documents",
+      "flat RAG pipelines",
+      "related articles",
+      "connections"
+    ],
+    "potential_solution_ideas": [
+      "Develop a tool that improves the retrieval of related articles in regulation-heavy documents by better recognizing and connecting references, definitions, or clauses."
+    ],
+    "discovered_at": "2026-01-18T17:06:13.502264",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0017",
+    "description": "Users are seeking alternatives to command-line tools for faster processing compared to Hadoop clusters.",
+    "severity": "medium",
+    "frequency": "rare",
+    "target_users": "Developers and data analysts working with large datasets",
+    "evidence": [
+      "\"Command-line Tools can be 235x Faster than your Hadoop Cluster (2014)\""
+    ],
+    "sources": [
+      "hackernews"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "command-line tools",
+      "Hadoop clusters",
+      "faster processing",
+      "large datasets"
+    ],
+    "potential_solution_ideas": [
+      "Create a tool that offers faster processing of large datasets compared to traditional Hadoop clusters using command-line interfaces."
+    ],
+    "discovered_at": "2026-01-18T17:06:13.502283",
+    "validation_status": "unvalidated",
+    "score": 3.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0018",
+    "description": "Users are looking for a simplified workflow or tool to manage the complexity of multiple programming languages, such as Kip (a language based on grammatical cases of Turkish).",
+    "severity": "medium",
+    "frequency": "occasional",
+    "target_users": "Developers working with multiple programming languages",
+    "evidence": [
+      "\"Kip: A programming language based on grammatical cases of Turkish\""
+    ],
+    "sources": [
+      "hackernews"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "programming languages",
+      "workflow",
+      "simplify",
+      "manage",
+      "multiple languages"
+    ],
+    "potential_solution_ideas": [
+      "Develop a tool that allows developers to manage and switch between multiple programming languages easily within a unified environment."
+    ],
+    "discovered_at": "2026-01-18T17:06:13.502293",
+    "validation_status": "unvalidated",
+    "score": 4.8,
+    "metadata": {}
+  },
+  {
+    "id": "PROB-20260118-0019",
+    "description": "Users are struggling with the complexity and time-consuming nature of serving models with Triton Inference Server.",
+    "severity": "high",
+    "frequency": "occasional",
+    "target_users": "Machine learning engineers and data scientists",
+    "evidence": [
+      "\"Five Practical Lessons for Serving Models with Triton Inference Server\""
+    ],
+    "sources": [
+      "hackernews"
+    ],
+    "domain": "tech_dev",
+    "keywords": [
+      "machine learning",
+      "serving models",
+      "complexity",
+      "time-consuming",
+      "Triton Inference Server"
+    ],
+    "potential_solution_ideas": [
+      "Simplify the process of serving models with Triton Inference Server by reducing complexity and improving efficiency."
+    ],
+    "discovered_at": "2026-01-18T17:06:13.502302",
+    "validation_status": "unvalidated",
+    "score": 5.8,
+    "metadata": {}
+  }
+]
