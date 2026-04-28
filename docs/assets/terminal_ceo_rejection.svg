@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 360" font-family="'JetBrains Mono','Fira Code','Courier New',monospace">
+  <rect width="780" height="360" fill="#0d1117" rx="10"/>
+  <rect width="780" height="36" fill="#161b22" rx="10"/>
+  <rect y="18" width="780" height="18" fill="#161b22"/>
+  <circle cx="20" cy="18" r="6" fill="#ff5f57"/>
+  <circle cx="40" cy="18" r="6" fill="#febc2e"/>
+  <circle cx="60" cy="18" r="6" fill="#28c840"/>
+  <text x="390" y="23" text-anchor="middle" fill="#8b949e" font-size="12">CEO Approval Gate — Round 2</text>
+
+  <text x="20" y="62" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="62" fill="#79c0ff" font-size="12">[CEO]</text>
+  <text x="85" y="62" fill="#8b949e" font-size="12">Evaluating Developer submission (confidence: 0.71)</text>
+
+  <text x="20" y="84" fill="#8b949e" font-size="11">  Evidence audit: 3 test files found · 0 execution logs · README missing install steps</text>
+  <text x="20" y="102" fill="#8b949e" font-size="11">  Problem-solution fit: CLI flags present but core metric collection unimplemented</text>
+  <text x="20" y="120" fill="#8b949e" font-size="11">  User perspective: a user cannot run this without modifying source</text>
+
+  <line x1="20" y1="134" x2="760" y2="134" stroke="#21262d" stroke-width="1"/>
+
+  <text x="20" y="155" fill="#ff7b72" font-size="13" font-weight="bold">✗  DECISION: REJECT</text>
+
+  <text x="20" y="178" fill="#e6edf3" font-size="11">  Fix list (address all before resubmission):</text>
+  <text x="20" y="197" fill="#8b949e" font-size="11">  1. Implement cpu_percent(), memory_used_gb(), disk_io_bytes() — currently stubbed</text>
+  <text x="20" y="214" fill="#8b949e" font-size="11">  2. Add integration test that runs `python monitor.py --interval 1 --count 3`</text>
+  <text x="20" y="231" fill="#8b949e" font-size="11">     and asserts non-zero output on stdout</text>
+  <text x="20" y="248" fill="#8b949e" font-size="11">  3. README Quick Start must show exact command sequence from clone to first run</text>
+  <text x="20" y="265" fill="#8b949e" font-size="11">  4. Remove hardcoded path `/tmp/monitor.log` — use platform-appropriate default</text>
+
+  <line x1="20" y1="279" x2="760" y2="279" stroke="#21262d" stroke-width="1"/>
+
+  <text x="20" y="299" fill="#8b949e" font-size="11">  Routing back to Developer for iteration 3...</text>
+  <text x="20" y="318" fill="#f0883e" font-size="11">  Escalation threshold: round 4 → systemic failure review (CTO redesign path)</text>
+  <text x="20" y="340" fill="#8b949e" font-size="11">  Confidence required for approval: ≥ 0.85  ·  Current: 0.71</text>
+</svg>

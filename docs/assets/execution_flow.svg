@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 740" font-family="'Segoe UI', system-ui, sans-serif">
+  <rect width="340" height="740" fill="#0d1117" rx="12"/>
+  <text x="170" y="30" text-anchor="middle" fill="#8b949e" font-size="11" letter-spacing="2">EXECUTION FLOW</text>
+
+  <!-- Helper macro: box + arrow -->
+  <!-- Step 1 -->
+  <rect x="60" y="48" width="220" height="50" rx="7" fill="#1f6feb" opacity="0.18" stroke="#1f6feb" stroke-width="1.5"/>
+  <text x="170" y="69" text-anchor="middle" fill="#79c0ff" font-size="12" font-weight="700">Problem Discovery</text>
+  <text x="170" y="86" text-anchor="middle" fill="#8b949e" font-size="10">Web scrape · credibility score · rank</text>
+  <line x1="170" y1="98" x2="170" y2="118" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 2 -->
+  <rect x="60" y="118" width="220" height="50" rx="7" fill="#2ea043" opacity="0.15" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="170" y="139" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">CEO Planning</text>
+  <text x="170" y="156" text-anchor="middle" fill="#8b949e" font-size="10">Vision · success criteria · risk</text>
+  <line x1="170" y1="168" x2="170" y2="188" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 3 -->
+  <rect x="60" y="188" width="220" height="50" rx="7" fill="#2ea043" opacity="0.15" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="170" y="209" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">Research + CTO Design</text>
+  <text x="170" y="226" text-anchor="middle" fill="#8b949e" font-size="10">Stack selection · architecture</text>
+  <line x1="170" y1="238" x2="170" y2="258" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 4 -->
+  <rect x="60" y="258" width="220" height="50" rx="7" fill="#2ea043" opacity="0.15" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="170" y="279" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">PM Sprint Planning</text>
+  <text x="170" y="296" text-anchor="middle" fill="#8b949e" font-size="10">User stories · backlog · criteria</text>
+  <line x1="170" y1="308" x2="170" y2="328" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Debate box -->
+  <rect x="80" y="328" width="180" height="36" rx="6" fill="#f0883e" opacity="0.15" stroke="#f0883e" stroke-width="1.2"/>
+  <text x="170" y="351" text-anchor="middle" fill="#f0883e" font-size="10" font-weight="600">⇌  Architecture Debate</text>
+  <line x1="170" y1="364" x2="170" y2="384" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 5 -->
+  <rect x="60" y="384" width="220" height="50" rx="7" fill="#f78166" opacity="0.15" stroke="#f78166" stroke-width="1.5"/>
+  <text x="170" y="405" text-anchor="middle" fill="#ffa198" font-size="12" font-weight="700">Developer Execution</text>
+  <text x="170" y="422" text-anchor="middle" fill="#8b949e" font-size="10">Tree-of-Thoughts · ReAct · CONFIDENCE</text>
+  <line x1="170" y1="434" x2="170" y2="454" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 6 -->
+  <rect x="60" y="454" width="220" height="50" rx="7" fill="#f78166" opacity="0.15" stroke="#f78166" stroke-width="1.5"/>
+  <text x="170" y="475" text-anchor="middle" fill="#ffa198" font-size="12" font-weight="700">QA + Security Audit</text>
+  <text x="170" y="492" text-anchor="middle" fill="#8b949e" font-size="10">Test suite · coverage · CVSS patch</text>
+  <line x1="170" y1="504" x2="170" y2="524" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 7 CEO gate -->
+  <rect x="60" y="524" width="220" height="50" rx="7" fill="#1f6feb" opacity="0.18" stroke="#1f6feb" stroke-width="1.5"/>
+  <text x="170" y="545" text-anchor="middle" fill="#79c0ff" font-size="12" font-weight="700">CEO Approval Gate</text>
+  <text x="170" y="562" text-anchor="middle" fill="#8b949e" font-size="10">APPROVE  ·  REJECT  ·  REQUEST_INFO</text>
+
+  <!-- Rejection loop arrow -->
+  <path d="M280 549 Q320 549 320 435 Q320 384 280 405" fill="none" stroke="#ff7b72" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-red)"/>
+  <text x="322" y="490" fill="#ff7b72" font-size="9" text-anchor="middle">REJECT</text>
+  <text x="322" y="501" fill="#8b949e" font-size="8" text-anchor="middle">↑ reruns</text>
+
+  <line x1="170" y1="574" x2="170" y2="594" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 8 -->
+  <rect x="60" y="594" width="220" height="50" rx="7" fill="#d2a8ff" opacity="0.15" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="170" y="615" text-anchor="middle" fill="#d2a8ff" font-size="12" font-weight="700">DevOps + Data Analyst</text>
+  <text x="170" y="632" text-anchor="middle" fill="#8b949e" font-size="10">CI/CD · cost report · session log</text>
+  <line x1="170" y1="644" x2="170" y2="664" stroke="#30363d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Output -->
+  <rect x="60" y="664" width="220" height="52" rx="7" fill="#1a7f37" opacity="0.8"/>
+  <text x="170" y="686" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">output/solutions/</text>
+  <text x="170" y="703" text-anchor="middle" fill="#b7f8c8" font-size="10">code · tests · docs · Docker · CI · report</text>
+
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#30363d"/>
+    </marker>
+    <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#ff7b72"/>
+    </marker>
+  </defs>
+</svg>

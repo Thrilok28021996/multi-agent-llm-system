@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" font-family="'JetBrains Mono', 'Fira Code', 'Courier New', monospace">
+  <!-- Terminal window -->
+  <rect width="780" height="500" fill="#0d1117" rx="10"/>
+  <!-- Title bar -->
+  <rect width="780" height="36" fill="#161b22" rx="10"/>
+  <rect y="18" width="780" height="18" fill="#161b22"/>
+  <!-- Window buttons -->
+  <circle cx="20" cy="18" r="6" fill="#ff5f57"/>
+  <circle cx="40" cy="18" r="6" fill="#febc2e"/>
+  <circle cx="60" cy="18" r="6" fill="#28c840"/>
+  <text x="390" y="23" text-anchor="middle" fill="#8b949e" font-size="12">zsh — multi-agent-llm-company-system</text>
+
+  <!-- Terminal content -->
+  <text x="20" y="65" fill="#8b949e" font-size="12">$</text>
+  <text x="35" y="65" fill="#e6edf3" font-size="12">python main.py --run --problem "Build a CLI tool to monitor system resources"</text>
+
+  <text x="20" y="92" fill="#56d364" font-size="12">✓</text>
+  <text x="38" y="92" fill="#79c0ff" font-size="12">Orchestrator</text>
+  <text x="130" y="92" fill="#8b949e" font-size="12">Initializing 9-agent pipeline...</text>
+
+  <text x="20" y="115" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="115" fill="#ffa198" font-size="12">[CEO]</text>
+  <text x="88" y="115" fill="#8b949e" font-size="12">Analyzing market opportunity for system monitoring tools</text>
+
+  <text x="20" y="138" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="138" fill="#ffa198" font-size="12">[Researcher]</text>
+  <text x="120" y="138" fill="#8b949e" font-size="12">Scraping 12 sources · credibility score: 0.91</text>
+
+  <text x="20" y="161" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="161" fill="#ffa198" font-size="12">[CTO]</text>
+  <text x="80" y="161" fill="#8b949e" font-size="12">Selected stack: Python · psutil · rich · Click</text>
+
+  <text x="20" y="184" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="184" fill="#ffa198" font-size="12">[Product Mgr]</text>
+  <text x="128" y="184" fill="#8b949e" font-size="12">Generated 8 user stories · sprint plan ready</text>
+
+  <text x="20" y="207" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="207" fill="#ffa198" font-size="12">[Developer]</text>
+  <text x="118" y="207" fill="#8b949e" font-size="12">Writing code</text>
+  <text x="220" y="207" fill="#d2a8ff" font-size="12">monitor.py</text>
+  <text x="295" y="207" fill="#8b949e" font-size="12">·</text>
+  <text x="308" y="207" fill="#d2a8ff" font-size="12">cpu.py</text>
+  <text x="358" y="207" fill="#8b949e" font-size="12">·</text>
+  <text x="371" y="207" fill="#d2a8ff" font-size="12">memory.py</text>
+  <text x="450" y="207" fill="#8b949e" font-size="12">·</text>
+  <text x="463" y="207" fill="#d2a8ff" font-size="12">disk.py</text>
+
+  <text x="20" y="230" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="230" fill="#ffa198" font-size="12">[QA Engineer]</text>
+  <text x="133" y="230" fill="#8b949e" font-size="12">Generated 24 tests · coverage: 94%</text>
+
+  <text x="20" y="253" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="253" fill="#ffa198" font-size="12">[Security]</text>
+  <text x="105" y="253" fill="#8b949e" font-size="12">Audit complete · 0 critical · 1 low (patched)</text>
+
+  <text x="20" y="276" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="276" fill="#ffa198" font-size="12">[DevOps]</text>
+  <text x="105" y="276" fill="#8b949e" font-size="12">Generated Dockerfile · docker-compose.yml · CI workflow</text>
+
+  <text x="20" y="299" fill="#56d364" font-size="12">►</text>
+  <text x="38" y="299" fill="#ffa198" font-size="12">[Data Analyst]</text>
+  <text x="133" y="299" fill="#8b949e" font-size="12">Pipeline report saved to output/reports/</text>
+
+  <!-- Separator -->
+  <line x1="20" y1="318" x2="760" y2="318" stroke="#21262d" stroke-width="1"/>
+
+  <text x="20" y="340" fill="#56d364" font-size="13" font-weight="bold">✓ Solution generated successfully</text>
+
+  <text x="20" y="365" fill="#8b949e" font-size="11">Output directory:</text>
+  <text x="135" y="365" fill="#79c0ff" font-size="11">output/solutions/solution_20240428_143022/</text>
+
+  <text x="20" y="385" fill="#8b949e" font-size="11">  ├── src/          (4 files, 312 lines)</text>
+  <text x="20" y="402" fill="#8b949e" font-size="11">  ├── tests/        (24 tests, 94% coverage)</text>
+  <text x="20" y="419" fill="#8b949e" font-size="11">  ├── docs/         README.md · ARCHITECTURE.md</text>
+  <text x="20" y="436" fill="#8b949e" font-size="11">  ├── Dockerfile · docker-compose.yml</text>
+  <text x="20" y="453" fill="#8b949e" font-size="11">  └── .github/workflows/ci.yml</text>
+
+  <text x="20" y="479" fill="#8b949e" font-size="11">Total elapsed:</text>
+  <text x="120" y="479" fill="#56d364" font-size="11">4m 38s</text>
+  <text x="175" y="479" fill="#8b949e" font-size="11">·  LLM calls: 47  ·  Tokens: ~68,400</text>
+</svg>

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="'Segoe UI', system-ui, sans-serif">
+  <!-- Background -->
+  <rect width="900" height="620" fill="#0d1117" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" fill="#e6edf3" font-size="18" font-weight="700">Multi-Agent LLM Company — Architecture</text>
+
+  <!-- Input box -->
+  <rect x="350" y="70" width="200" height="50" rx="8" fill="#1f6feb" opacity="0.9"/>
+  <text x="450" y="100" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Problem Statement</text>
+
+  <!-- Arrow down to Orchestrator -->
+  <line x1="450" y1="120" x2="450" y2="155" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Orchestrator -->
+  <rect x="300" y="155" width="300" height="50" rx="8" fill="#388bfd" opacity="0.2" stroke="#388bfd" stroke-width="1.5"/>
+  <text x="450" y="185" text-anchor="middle" fill="#79c0ff" font-size="13" font-weight="600">Orchestrator + Message Bus</text>
+
+  <!-- Arrow down to agents row -->
+  <line x1="450" y1="205" x2="450" y2="235" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Agent pipeline row 1 -->
+  <!-- CEO -->
+  <rect x="30" y="240" width="110" height="60" rx="8" fill="#2ea043" opacity="0.2" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="85" y="266" text-anchor="middle" fill="#56d364" font-size="12" font-weight="600">CEO</text>
+  <text x="85" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Strategy &amp; Vision</text>
+
+  <!-- CTO -->
+  <rect x="155" y="240" width="110" height="60" rx="8" fill="#2ea043" opacity="0.2" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="210" y="266" text-anchor="middle" fill="#56d364" font-size="12" font-weight="600">CTO</text>
+  <text x="210" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Tech Architecture</text>
+
+  <!-- Researcher -->
+  <rect x="280" y="240" width="110" height="60" rx="8" fill="#2ea043" opacity="0.2" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="335" y="266" text-anchor="middle" fill="#56d364" font-size="12" font-weight="600">Researcher</text>
+  <text x="335" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Web + Credibility</text>
+
+  <!-- Product Manager -->
+  <rect x="405" y="240" width="110" height="60" rx="8" fill="#2ea043" opacity="0.2" stroke="#2ea043" stroke-width="1.5"/>
+  <text x="460" y="266" text-anchor="middle" fill="#56d364" font-size="12" font-weight="600">Product Mgr</text>
+  <text x="460" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Specs &amp; Backlog</text>
+
+  <!-- Developer -->
+  <rect x="530" y="240" width="110" height="60" rx="8" fill="#f78166" opacity="0.2" stroke="#f78166" stroke-width="1.5"/>
+  <text x="585" y="266" text-anchor="middle" fill="#ffa198" font-size="12" font-weight="600">Developer</text>
+  <text x="585" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Code Generation</text>
+
+  <!-- QA Engineer -->
+  <rect x="655" y="240" width="110" height="60" rx="8" fill="#f78166" opacity="0.2" stroke="#f78166" stroke-width="1.5"/>
+  <text x="710" y="266" text-anchor="middle" fill="#ffa198" font-size="12" font-weight="600">QA Engineer</text>
+  <text x="710" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Tests &amp; Validation</text>
+
+  <!-- Security -->
+  <rect x="780" y="240" width="90" height="60" rx="8" fill="#f78166" opacity="0.2" stroke="#f78166" stroke-width="1.5"/>
+  <text x="825" y="266" text-anchor="middle" fill="#ffa198" font-size="12" font-weight="600">Security</text>
+  <text x="825" y="284" text-anchor="middle" fill="#8b949e" font-size="10">Audit &amp; Harden</text>
+
+  <!-- row 2: DevOps + Data Analyst -->
+  <rect x="280" y="330" width="130" height="60" rx="8" fill="#d2a8ff" opacity="0.2" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="345" y="356" text-anchor="middle" fill="#d2a8ff" font-size="12" font-weight="600">DevOps</text>
+  <text x="345" y="374" text-anchor="middle" fill="#8b949e" font-size="10">Deploy &amp; Infra</text>
+
+  <rect x="430" y="330" width="140" height="60" rx="8" fill="#d2a8ff" opacity="0.2" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="500" y="356" text-anchor="middle" fill="#d2a8ff" font-size="12" font-weight="600">Data Analyst</text>
+  <text x="500" y="374" text-anchor="middle" fill="#8b949e" font-size="10">Metrics &amp; Reports</text>
+
+  <!-- Collaboration layer -->
+  <rect x="120" y="420" width="660" height="55" rx="8" fill="#3d1f00" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="450" y="443" text-anchor="middle" fill="#f0883e" font-size="12" font-weight="600">Collaboration Layer</text>
+  <text x="450" y="462" text-anchor="middle" fill="#8b949e" font-size="10">Meeting · Debate · Critic Ensemble · MoA Aggregator</text>
+
+  <!-- Memory layer -->
+  <rect x="120" y="495" width="660" height="55" rx="8" fill="#0c2d6b" stroke="#388bfd" stroke-width="1.5"/>
+  <text x="450" y="518" text-anchor="middle" fill="#79c0ff" font-size="12" font-weight="600">Memory &amp; Context</text>
+  <text x="450" y="537" text-anchor="middle" fill="#8b949e" font-size="10">RAG Store · Session Memory · Shared Memory · Learning</text>
+
+  <!-- Output -->
+  <rect x="320" y="565" width="260" height="42" rx="8" fill="#1a7f37" opacity="0.8"/>
+  <text x="450" y="591" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Generated Solution (output/)</text>
+
+  <!-- Arrows from agents to collaboration -->
+  <line x1="450" y1="300" x2="450" y2="420" stroke="#444c56" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="450" y1="390" x2="450" y2="420" stroke="#444c56" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <!-- Arrow collaboration to memory -->
+  <line x1="450" y1="475" x2="450" y2="495" stroke="#444c56" stroke-width="2" marker-end="url(#arrow2)"/>
+  <!-- Arrow memory to output -->
+  <line x1="450" y1="550" x2="450" y2="565" stroke="#444c56" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Pipeline connector line (top of agents) -->
+  <line x1="85" y1="240" x2="825" y2="240" stroke="#2ea043" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#444c56"/>
+    </marker>
+  </defs>
+</svg>
