@@ -66,38 +66,69 @@ def create_custom_problem(
 
 
 def check_models(config: ModelConfig) -> dict:
-    """Check which required Ollama models are pulled."""
-    from config.llm_client import get_ollama_host
-    from config.models import MODEL_CONFIGS
+    """Check which required models are available on the configured backend."""
+    from config.llm_client import _get_backend, OllamaBackend
 
+    # Use env-overridden configs, not bare MODEL_CONFIGS
+    unique_specs = {spec.model_id(_get_backend()): spec for spec in config.configs.values()}
+    backend = _get_backend()
     status = {}
-    unique_specs = {spec.name: spec for spec in MODEL_CONFIGS.values()}
 
-    try:
-        import ollama as _ollama
-        host = get_ollama_host()
-        client = _ollama.Client(host=host)
-        pulled = {m["name"] for m in client.list().get("models", [])}
-        for name, spec in unique_specs.items():
-            tag = spec.ollama_model
-            found = any(tag in p for p in pulled)
-            status[name] = f"{'found' if found else 'missing'} ({tag})"
-    except Exception as e:
-        for name, spec in unique_specs.items():
-            status[name] = f"server unreachable ({e})"
+    if backend == "ollama":
+        try:
+            import ollama as _ollama
+            host = OllamaBackend()._host()
+            client = _ollama.Client(host=host)
+            pulled = {m["name"] for m in client.list().get("models", [])}
+            for model_id, spec in unique_specs.items():
+                found = any(model_id in p for p in pulled)
+                status[model_id] = f"{'found' if found else 'missing'} ({model_id})"
+        except Exception as e:
+            for model_id in unique_specs:
+                status[model_id] = f"server unreachable ({e})"
+    else:
+        # LM Studio exposes /v1/models — probe it to see which models are loaded.
+        host = os.environ.get("LMSTUDIO_HOST", "http://localhost:1234/v1").rstrip("/")
+        url = f"{host}/models"
+        try:
+            import urllib.request
+            import urllib.error
+            with urllib.request.urlopen(url, timeout=5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            available_ids = {m.get("id") for m in payload.get("data", []) if m.get("id")}
+            for model_id in unique_specs:
+                if model_id in available_ids:
+                    status[model_id] = f"loaded ({model_id})"
+                elif available_ids:
+                    # LM Studio is reachable but this model isn't currently loaded.
+                    status[model_id] = f"not loaded — LM Studio has: {', '.join(sorted(available_ids))[:120]}"
+                else:
+                    status[model_id] = f"not found ({model_id})"
+        except Exception as e:
+            # Connection error — warn but don't crash.
+            print(f"Warning: could not reach LM Studio at {url}: {e}")
+            for model_id in unique_specs:
+                status[model_id] = f"server unreachable ({e})"
 
     return status
 
 
 def print_model_status(status: dict) -> None:
     """Print model availability status."""
-    from config.llm_client import get_ollama_host
+    from config.llm_client import _get_backend, OllamaBackend
+    backend = _get_backend()
+    server = OllamaBackend()._host() if backend == "ollama" else "LM Studio"
     print("\n=== Model Status ===")
-    print(f"Ollama server: {get_ollama_host()}\n")
+    print(f"Backend: {backend}  |  Server: {server}\n")
     for model, state in status.items():
-        icon = "✓" if "found" in state else "✗"
+        if "loaded (" in state or state.startswith("found "):
+            icon = "✓"
+        elif "not loaded" in state or "assumed" in state:
+            icon = "~"
+        else:
+            icon = "✗"
         print(f"  {icon} {model}: {state}")
-    missing = [m for m, s in status.items() if "missing" in s or "unreachable" in s]
+    missing = [m for m, s in status.items() if "missing" in s or "unreachable" in s or "not found" in s]
     if missing:
         print(f"\n✗ {len(missing)} model(s) not available.")
         print("  Start Ollama: ollama serve")
@@ -548,9 +579,9 @@ Generated code: current directory (override with --output-dir or --target)
     parser.add_argument(
         "--backend",
         type=str,
-        choices=["ollama"],
+        choices=["ollama", "lmstudio"],
         default=None,
-        help="LLM backend (ollama only)"
+        help="LLM backend: ollama or lmstudio"
     )
     parser.add_argument(
         "--problem",

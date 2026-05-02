@@ -3,6 +3,7 @@
 **A hierarchical autonomous AI organization composed of role-specialized agents that independently discover problems, delegate execution, debate solutions, enforce quality rejection, and synthesize final outcomes — with persistent memory and RAG-backed context.**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
+[![LM Studio](https://img.shields.io/badge/LM%20Studio-local%20LLMs-orange)](https://lmstudio.ai)
 [![Ollama](https://img.shields.io/badge/Ollama-local%20LLMs-black)](https://ollama.ai)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Agents](https://img.shields.io/badge/Agents-9%20specialists-purple)](agents/)
@@ -32,7 +33,7 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 
 **Autonomous Company Orchestrator** addresses each failure directly:
 
-- **Role separation** — nine agents with dedicated system prompts, temperatures, and decision authority
+- **Role separation** — nine agents with dedicated system prompts, temperatures, and model assignments
 - **Internal criticism** — Critic Ensemble and DebateOrchestrator challenge outputs before they reach the CEO
 - **Iterative rejection** — CEO rejects work with a numbered fix list; Developer reruns until approval
 - **Persistent memory** — RAG store, session memory, and cross-session learning survive between runs
@@ -62,7 +63,7 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 
 | Subsystem | Module | Responsibility |
 |---|---|---|
-| Workflow engine | `orchestrator/workflow.py` | Phase-gated execution graph across 11 defined phases |
+| Workflow engine | `orchestrator/workflow.py` | Phase-gated execution graph across 13 defined phases |
 | Message bus | `orchestrator/message_bus.py` | Priority-queued async pub/sub between agents |
 | Escalation | `orchestrator/escalation.py` | Auto-retry and fallback; systemic failure routing after round 4 |
 | Structured debate | `collaboration/debate.py` | N-round argumentation with synthesis; used for architecture decisions |
@@ -88,10 +89,12 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | **Developer Confidence Scoring** | Every Developer submission ends with `CONFIDENCE: X.X`; CEO threshold is ≥ 0.85 |
 | **Persistent Session Memory** | RAG store + session state survive between runs; past solutions inform future ones |
 | **Escalation System** | After round 4 of rejection, triggers systemic failure review — CTO redesign path or PM rescoping |
-| **Cost Governance** | Token usage, latency, and iteration counts tracked per agent per run |
-| **First-Principles CoT** | Every agent uses structured chain-of-thought: understand → analyze → explore → evaluate → decide |
+| **Token Usage Governance** | Token usage, latency, and iteration counts tracked per agent per run |
+| **Adaptive Chain-of-Thought** | Complex tasks trigger full `think()` + structured CoT; simple tasks skip the extra LLM call |
 | **Credibility Scoring** | Researcher scores each source 0–1; cross-validates claims before passing to CTO |
 | **Org-Level Memory** | Company culture, trust scores, hiring criteria, sprint history tracked across sessions |
+| **Dual Backend Support** | Runs on LM Studio or Ollama; switch with one env var; model IDs resolved per backend |
+| **Concurrency Control** | Async + sync semaphores prevent LM Studio queue spikes; configurable via `LLM_MAX_CONCURRENCY` |
 
 ---
 
@@ -115,65 +118,103 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 
 | Category | Technology |
 |---|---|
-| **LLM Backend** | [Ollama](https://ollama.ai) — fully local, no API keys, no cloud |
-| **Default Model** | `qwen3:8b` per agent (configurable per role in `config/models.py`) |
-| **Orchestration** | Custom Python phase-gated workflow engine |
-| **Reasoning** | Tree of Thoughts · ReAct loop · First-principles chain-of-thought |
+| **LLM Backend** | [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.ai) — fully local, no API keys |
+| **Default Models** | Reasoning: `Qwen3.5-9B` · Code: `Qwen2.5-Coder-7B` · QA: `DeepSeek-R1-Distill-Qwen-7B` |
+| **Model Config** | Per-role assignments via `.env` — change one line, reflects everywhere |
+| **Orchestration** | Custom Python phase-gated workflow engine (13 phases) |
+| **Reasoning** | Adaptive CoT · Tree of Thoughts · ReAct loop · First-principles thinking |
 | **Collaboration** | Structured debate · Agent meetings · Critic ensemble · MoA aggregator |
 | **Memory** | Local TF-IDF RAG · session memory · shared context · cross-session learning |
-| **Retrieval** | scikit-learn TF-IDF cosine similarity (~20–30MB RAM, no GPU) |
 | **Web Research** | BeautifulSoup4 · async scraper · credibility scorer · cross-validator |
-| **Tools** | LSP integration · git tools · code formatter · test runner · MCP |
-| **Logging** | Structured JSON logs · cost tracker · progress tracker · health checker |
+| **Tools** | LSP integration · git tools · code formatter · test runner |
+| **Logging** | Structured JSON logs · usage tracker · progress tracker · health checker |
 | **UI** | Rich terminal · streaming output · interactive mode |
 
 ---
 
 ## Quick Start
 
-**Requirements:** Python 3.10+, [Ollama](https://ollama.ai) installed and running
+**Requirements:** Python 3.10+, [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.ai)
 
 ```bash
 # 1. Clone
 git clone https://github.com/Thrilok28021996/autonomous-company-orchestrator.git
 cd autonomous-company-orchestrator
 
-# 2. Install
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Pull the default model
-ollama pull qwen3:8b
+# 3. Configure
+cp .env.example .env
+# Edit .env — set LLM_BACKEND and model IDs for your setup
 
 # 4. Run with a problem statement
-python main.py --run --problem "Build a CLI tool to monitor system resources"
+python main.py "Build a CLI tool to monitor system resources"
 ```
 
 Output lands in `output/solutions/solution_<timestamp>/`
 
-### All Modes
+### LM Studio Setup
+
+```bash
+# In .env
+LLM_BACKEND=lmstudio
+LMSTUDIO_HOST=http://localhost:1234/v1
+
+# Per-role model IDs (LM Studio model identifier)
+LMSTUDIO_MODEL_CEO=Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF
+LMSTUDIO_MODEL_DEVELOPER=lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF
+LMSTUDIO_MODEL_QA_ENGINEER=lmstudio-community/DeepSeek-R1-Distill-Qwen-7B-GGUF
+# ... (see .env.example for all 9 roles)
+```
+
+Open LM Studio → Local Server tab → Start Server. Models are auto-loaded on demand.
+
+### Ollama Setup
+
+```bash
+# In .env
+LLM_BACKEND=ollama
+MODEL_CEO=qwen3.5:9b-q4_K_M
+MODEL_DEVELOPER=qwen2.5-coder:7b
+# ... (see .env.example for all 9 roles)
+
+# Pull required models
+ollama pull qwen3.5:9b-q4_K_M
+ollama pull qwen2.5-coder:7b
+```
+
+### Recommended Models (16GB RAM)
+
+| Tier | Model | RAM | Used By |
+|---|---|---|---|
+| Reasoning | Qwen3.5-9B Q4_K_M | ~5.6GB | CEO, CTO, PM, Researcher, DataAnalyst |
+| Code | Qwen2.5-Coder-7B Q4_K_M | ~4.4GB | Developer, DevOps, Security |
+| QA | DeepSeek-R1-Distill-Qwen-7B Q4_K_M | ~4.4GB | QA Engineer |
+
+3 models total. LM Studio swaps on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
+
+### All CLI Modes
 
 | Mode | Command |
 |---|---|
-| Run with problem statement | `python main.py --run --problem "..."` |
-| Enhance existing codebase | `python main.py --run --current-dir --problem "..."` |
+| Run with problem statement | `python main.py "Build a REST API for user auth"` |
+| Enhance existing codebase | `python main.py "Add tests" --current-dir` |
 | Autonomous problem discovery | `python main.py --discover` |
 | Interactive session | `python main.py --interactive` |
-| Scaffold only (no LLM) | `python main.py --run --scaffold --problem "..."` |
-| Check available models | `python main.py --check-models` |
+| Check loaded models | `python main.py --check-models` |
+| Switch backend at runtime | `python main.py "..." --backend lmstudio` |
 
-### Configuration
+### Environment Variables
 
-```python
-# config/models.py — different model per agent
-DEVELOPER_MODEL = "qwen2.5-coder:7b"
-CEO_MODEL       = "qwen3:8b"
-```
-
-```bash
-# Environment overrides
-MULTI_AGENT_LLM_DATA_DIR=~/.autonomous-company   # data directory
-OLLAMA_HOST=http://localhost:11434                # custom Ollama endpoint
-```
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_BACKEND` | `ollama` | `ollama` or `lmstudio` |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `LMSTUDIO_HOST` | `http://localhost:1234/v1` | LM Studio server URL |
+| `MODEL_<ROLE>` | see `config/models.py` | Ollama model tag per role |
+| `LMSTUDIO_MODEL_<ROLE>` | see `config/models.py` | LM Studio model ID per role |
+| `LLM_MAX_CONCURRENCY` | `2` | Max concurrent LLM calls (raise for high-RAM setups) |
 
 ---
 
@@ -182,7 +223,7 @@ OLLAMA_HOST=http://localhost:11434                # custom Ollama endpoint
 ```
 autonomous-company-orchestrator/
 ├── agents/                  # Nine specialist agents + shared base
-│   ├── base_agent.py        # First-principles CoT, retry logic, cost tracking
+│   ├── base_agent.py        # Adaptive CoT, retry logic, semaphore, context trimming
 │   ├── thinking.py          # Configurable reasoning depth engine
 │   ├── tree_of_thoughts.py  # Branch-score-execute reasoning
 │   ├── react_loop.py        # Reason-Act-Observe for tool agents
@@ -190,7 +231,7 @@ autonomous-company-orchestrator/
 │       qa_engineer · security_engineer · devops_engineer · data_analyst
 │
 ├── orchestrator/            # Pipeline engine
-│   ├── workflow.py          # 11-phase execution graph
+│   ├── workflow.py          # 13-phase execution graph
 │   ├── message_bus.py       # Priority-queued async agent communication
 │   ├── task_manager.py      # Task lifecycle and priority
 │   ├── escalation.py        # Failure routing and systemic review triggers
@@ -223,11 +264,18 @@ autonomous-company-orchestrator/
 │   ├── credibility.py       # Source credibility scoring (0–1)
 │   └── cross_validator.py
 │
-├── config/                  # Model, role, and domain configuration
-├── tools/                   # Agent tool integrations (git, LSP, test runner, MCP)
+├── config/                  # Model, role, and backend configuration
+│   ├── models.py            # Per-role ModelSpec; env-var override system
+│   ├── llm_client.py        # Unified LM Studio + Ollama client
+│   ├── settings.py          # Global settings with env overrides
+│   └── roles.py · validation.py
+│
+├── tools/                   # Agent tool integrations (git, LSP, test runner)
+├── utils/                   # Health checker, cost tracker, output validator
 ├── ui/                      # Rich terminal interface + streaming
 ├── docs/assets/             # Org chart · execution flow · terminal screenshots
 ├── tests/
+├── .env.example             # Full backend + model configuration template
 ├── main.py
 └── requirements.txt
 ```
@@ -236,8 +284,8 @@ autonomous-company-orchestrator/
 
 ## Roadmap
 
-- [ ] Web UI — real-time agent activity, cost dashboard, output browser
-- [ ] OpenAI / Anthropic / Groq backend support alongside Ollama
+- [ ] Web UI — real-time agent activity, usage dashboard, output browser
+- [ ] OpenAI / Anthropic / Groq backend support
 - [ ] Parallel agent execution for independent pipeline phases
 - [ ] GitHub Actions trigger — invoke pipeline from PR comment
 - [ ] Tool plugin framework for custom agent capabilities
@@ -253,10 +301,12 @@ This project explores practical implementations of:
 
 - Hierarchical multi-agent orchestration with real organizational authority
 - Autonomous quality governance via rejection loops and escalation thresholds
-- Reasoning-enhanced specialist agents (Tree of Thoughts, ReAct, first-principles CoT)
-- Persistent organizational memory with local RAG retrieval
-- Production-aware LLM cost monitoring and agent confidence scoring
+- Adaptive reasoning — full chain-of-thought only when complexity warrants it
+- Dual-backend LLM routing (LM Studio + Ollama) with per-role model assignment via env vars
+- Persistent organizational memory with local RAG retrieval (no GPU, no cloud)
+- Production-aware LLM usage monitoring and agent confidence scoring
 - Structured inter-agent debate and consensus mechanisms
+- Concurrency control for local LLM servers under memory constraints
 
 ---
 

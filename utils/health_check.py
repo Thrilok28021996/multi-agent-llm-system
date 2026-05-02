@@ -235,40 +235,58 @@ class HealthChecker:
         return self._circuit_breakers[service_name]
 
     def _check_llm_backend(self) -> HealthCheckResult:
-        """Check Ollama server availability."""
+        """Check LLM backend server availability."""
+        import os
+        import urllib.request
         start = time.perf_counter()
-        try:
-            import ollama as _ollama  # noqa
-            from config.llm_client import get_ollama_host
-            host = get_ollama_host()
-            client = _ollama.Client(host=host)
-            client.list()
-            latency_ms = (time.perf_counter() - start) * 1000
-            return HealthCheckResult(
-                name="llm_backend",
-                status=HealthStatus.HEALTHY,
-                message=f"Ollama server reachable at {host}",
-                latency_ms=latency_ms,
-                details={"backend": "ollama", "host": host},
-            )
-        except ImportError as e:
-            latency_ms = (time.perf_counter() - start) * 1000
-            return HealthCheckResult(
-                name="llm_backend",
-                status=HealthStatus.UNHEALTHY,
-                message="ollama Python package not installed",
-                latency_ms=latency_ms,
-                error=str(e),
-            )
-        except Exception as e:
-            latency_ms = (time.perf_counter() - start) * 1000
-            return HealthCheckResult(
-                name="llm_backend",
-                status=HealthStatus.UNHEALTHY,
-                message=f"Ollama server not reachable: {e}",
-                latency_ms=latency_ms,
-                error=str(e),
-            )
+        backend = os.getenv("LLM_BACKEND", "ollama").lower()
+
+        if backend == "ollama":
+            try:
+                import ollama as _ollama
+                host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                client = _ollama.Client(host=host)
+                client.list()
+                latency_ms = (time.perf_counter() - start) * 1000
+                return HealthCheckResult(
+                    name="llm_backend",
+                    status=HealthStatus.HEALTHY,
+                    message=f"Ollama reachable at {host}",
+                    latency_ms=latency_ms,
+                    details={"backend": "ollama", "host": host},
+                )
+            except Exception as e:
+                latency_ms = (time.perf_counter() - start) * 1000
+                return HealthCheckResult(
+                    name="llm_backend",
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Ollama not reachable: {e}",
+                    latency_ms=latency_ms,
+                    error=str(e),
+                )
+        else:
+            # LM Studio / MLX — probe the OpenAI-compatible /v1/models endpoint
+            host = os.getenv("LMSTUDIO_HOST", "http://localhost:1234/v1")
+            models_url = host.rstrip("/") + "/models"
+            try:
+                with urllib.request.urlopen(models_url, timeout=5) as resp:
+                    latency_ms = (time.perf_counter() - start) * 1000
+                    return HealthCheckResult(
+                        name="llm_backend",
+                        status=HealthStatus.HEALTHY,
+                        message=f"LM Studio reachable at {host}",
+                        latency_ms=latency_ms,
+                        details={"backend": backend, "host": host},
+                    )
+            except Exception as e:
+                latency_ms = (time.perf_counter() - start) * 1000
+                return HealthCheckResult(
+                    name="llm_backend",
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"LM Studio not reachable at {host}: {e}",
+                    latency_ms=latency_ms,
+                    error=str(e),
+                )
 
     def _check_disk_space(self) -> HealthCheckResult:
         """Check available disk space."""

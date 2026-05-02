@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 
 from config.llm_client import get_llm_client
-from config.models import MODEL_CONFIGS
+from config.models import ModelConfig
 from config.roles import AgentRole
 
 from ui.console import console
@@ -651,7 +651,8 @@ Keep it to 2-3 sentences."""
         try:
             # Resolve the model spec from the participant's role
             role_enum = next((r for r in AgentRole if r.value == participant.role), None)
-            model_spec = MODEL_CONFIGS.get(role_enum) if role_enum else next(iter(MODEL_CONFIGS.values()))
+            _mc = ModelConfig()
+            model_spec = _mc.get_model(role_enum) if role_enum else next(iter(_mc.configs.values()))
             text, _, _ = get_llm_client().chat(
                 model_spec,
                 [{"role": "user", "content": prompt}],

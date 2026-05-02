@@ -130,6 +130,14 @@ class MessageBus:
             # Log message
             self._log_message(msg_dict)
 
+            # Print human-readable communication trace
+            sender = msg_dict.get("sender", "?")
+            msg_type = msg_dict.get("message_type", "general")
+            content_preview = msg_dict.get("content", "")[:120].replace("\n", " ")
+            target = "ALL" if recipient == "all" else recipient
+            print(f"\n[AGENT COMM] {sender} ──► {target}  [{msg_type.upper()}]")
+            print(f"             {content_preview}")
+
             if recipient == "all":
                 # Broadcast to all agents except sender
                 return self._broadcast(message, msg_dict["sender"])
@@ -159,12 +167,9 @@ class MessageBus:
         )
 
         self.queues[recipient].put(prioritized)
-
-        # Also directly deliver to agent's inbox if available
-        if recipient in self.agents:
-            agent = self.agents[recipient]
-            if hasattr(agent, "receive_message"):
-                agent.receive_message(message)
+        # Note: do NOT also call agent.receive_message() here — the workflow
+        # consumes from the priority queue via get_messages(), so a direct
+        # inbox push would cause every message to be processed twice.
 
         return True
 

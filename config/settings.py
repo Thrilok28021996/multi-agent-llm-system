@@ -10,12 +10,21 @@ load_dotenv()
 
 @dataclass
 class LLMBackendConfig:
-    """LLM backend configuration for Ollama."""
+    """LLM backend configuration.
 
-    backend: str = "ollama"
-    # Ollama server address (override with OLLAMA_HOST env var)
+    Set LLM_BACKEND=lmstudio to use LM Studio instead of Ollama.
+    LM Studio must have its local server enabled (default port 1234).
+    """
+
+    # "ollama" | "lmstudio"
+    backend: str = field(default_factory=lambda: os.getenv("LLM_BACKEND", "ollama"))
+    # Ollama server address
     ollama_host: str = field(default_factory=lambda: os.getenv(
         "OLLAMA_HOST", "http://localhost:11434"
+    ))
+    # LM Studio server address (enable via LM Studio → Local Server → Start)
+    lmstudio_host: str = field(default_factory=lambda: os.getenv(
+        "LMSTUDIO_HOST", "http://localhost:1234/v1"
     ))
     timeout: int = 120
     num_ctx: int = 65536
@@ -81,8 +90,12 @@ class Settings:
         settings = cls()
 
         # Override with environment variables if present
+        if os.getenv("LLM_BACKEND"):
+            settings.llm.backend = os.getenv("LLM_BACKEND")
         if os.getenv("OLLAMA_HOST"):
             settings.llm.ollama_host = os.getenv("OLLAMA_HOST")
+        if os.getenv("LMSTUDIO_HOST"):
+            settings.llm.lmstudio_host = os.getenv("LMSTUDIO_HOST")
         if os.getenv("RATE_LIMIT_DELAY"):
             settings.research.rate_limit_delay = float(os.getenv("RATE_LIMIT_DELAY"))
         if os.getenv("LOG_LEVEL"):

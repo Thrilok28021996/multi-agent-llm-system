@@ -429,9 +429,9 @@ Find 1-5 distinct problems. Focus on real, actionable problems that could be sol
 
         try:
             from config.llm_client import get_llm_client
-            from config.models import MODEL_CONFIGS
+            from config.models import ModelConfig
             from config.roles import AgentRole
-            model_spec = MODEL_CONFIGS[AgentRole.RESEARCHER]
+            model_spec = ModelConfig().get_model(AgentRole.RESEARCHER)
             response_text, _, _ = await get_llm_client().chat_async(
                 model_spec,
                 [{"role": "user", "content": prompt}],
@@ -839,9 +839,9 @@ Output ONLY the queries, one per line, no numbering or explanation."""
 
         try:
             from config.llm_client import get_llm_client
-            from config.models import MODEL_CONFIGS
+            from config.models import ModelConfig
             from config.roles import AgentRole
-            model_spec = MODEL_CONFIGS[AgentRole.RESEARCHER]
+            model_spec = ModelConfig().get_model(AgentRole.RESEARCHER)
             text, _, _ = await get_llm_client().chat_async(
                 model_spec,
                 [{"role": "user", "content": prompt}],

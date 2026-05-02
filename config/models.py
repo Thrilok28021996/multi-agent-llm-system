@@ -22,13 +22,25 @@ from ui.console import console
 
 @dataclass
 class ModelSpec:
-    """Specification for an Ollama model."""
+    """Specification for a model — supports Ollama and LM Studio backends."""
 
     name: str                     # Display name
     ollama_model: str             # Ollama model tag (e.g. "qwen3:8b")
+    lmstudio_model: str = ""      # LM Studio model ID (e.g. "lmstudio-community/Qwen2.5-7B-Instruct-GGUF")
+                                  # If empty, falls back to ollama_model value (useful when IDs match)
     context_window: int = 65536
     temperature: float = 0.7
     description: str = ""
+
+    def model_id(self, backend: str) -> str:
+        """Return the correct model identifier for the given backend.
+
+        Any backend other than 'ollama' is treated as LM Studio compatible
+        (covers 'lmstudio', 'mlx', and future variants).
+        """
+        if backend != "ollama" and self.lmstudio_model:
+            return self.lmstudio_model
+        return self.ollama_model
 
 
 # =============================================================================
@@ -108,10 +120,59 @@ MODEL_CONFIGS: Dict[AgentRole, ModelSpec] = {
 
 
 class ModelConfig:
-    """Model configuration manager."""
+    """Model configuration manager.
+
+    Priority (highest → lowest):
+      1. custom_configs passed directly
+      2. Environment variables  (MODEL_<ROLE> and LMSTUDIO_MODEL_<ROLE>)
+      3. Hardcoded MODEL_CONFIGS defaults
+
+    Environment variable names:
+      MODEL_CEO, MODEL_CTO, MODEL_PRODUCT_MANAGER, MODEL_RESEARCHER,
+      MODEL_DEVELOPER, MODEL_QA_ENGINEER, MODEL_DEVOPS_ENGINEER,
+      MODEL_SECURITY_ENGINEER, MODEL_DATA_ANALYST
+
+    LM Studio equivalents (only needed when IDs differ from Ollama tags):
+      LMSTUDIO_MODEL_CEO, LMSTUDIO_MODEL_CTO, ... (same pattern)
+
+    Example .env:
+      MODEL_DEVELOPER=qwen2.5-coder:7b
+      LMSTUDIO_MODEL_DEVELOPER=lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF
+    """
+
+    # Maps AgentRole → env var suffix
+    _ROLE_ENV: Dict[AgentRole, str] = {
+        AgentRole.CEO:               "CEO",
+        AgentRole.CTO:               "CTO",
+        AgentRole.PRODUCT_MANAGER:   "PRODUCT_MANAGER",
+        AgentRole.RESEARCHER:        "RESEARCHER",
+        AgentRole.DEVELOPER:         "DEVELOPER",
+        AgentRole.QA_ENGINEER:       "QA_ENGINEER",
+        AgentRole.DEVOPS_ENGINEER:   "DEVOPS_ENGINEER",
+        AgentRole.SECURITY_ENGINEER: "SECURITY_ENGINEER",
+        AgentRole.DATA_ANALYST:      "DATA_ANALYST",
+    }
 
     def __init__(self, custom_configs: Optional[Dict[AgentRole, ModelSpec]] = None):
+        import os
         self.configs = MODEL_CONFIGS.copy()
+
+        # Apply env var overrides
+        for role, suffix in self._ROLE_ENV.items():
+            ollama_override = os.getenv(f"MODEL_{suffix}")
+            lmstudio_override = os.getenv(f"LMSTUDIO_MODEL_{suffix}")
+            if ollama_override or lmstudio_override:
+                spec = self.configs[role]
+                self.configs[role] = ModelSpec(
+                    name=ollama_override or spec.ollama_model,
+                    ollama_model=ollama_override or spec.ollama_model,
+                    lmstudio_model=lmstudio_override or spec.lmstudio_model,
+                    context_window=spec.context_window,
+                    temperature=spec.temperature,
+                    description=spec.description,
+                )
+
+        # custom_configs win over everything
         if custom_configs:
             self.configs.update(custom_configs)
 
@@ -119,17 +180,18 @@ class ModelConfig:
         return self.configs.get(role, MODEL_CONFIGS[AgentRole.RESEARCHER])
 
     def get_model_name(self, role_name: str) -> str:
+        from config.llm_client import _get_backend
         role_map = {r.value: r for r in AgentRole}
         role = role_map.get(role_name.lower())
         if role and role in self.configs:
-            return self.configs[role].name
+            return self.configs[role].model_id(_get_backend())
         return "thealxlabs/lumen:latest"
 
     def set_model(self, role: AgentRole, model_spec: ModelSpec) -> None:
         self.configs[role] = model_spec
 
-    def set_model_for_role(self, role_name: str, model_name: str) -> None:
-        """Update the Ollama model tag for a role."""
+    def set_model_for_role(self, role_name: str, model_name: str, lmstudio_model: str = "") -> None:
+        """Update the model tag for a role. Optionally set a separate LM Studio model ID."""
         role_map = {r.value: r for r in AgentRole}
         role = role_map.get(role_name.lower())
         if role and role in self.configs:
@@ -137,6 +199,7 @@ class ModelConfig:
             self.configs[role] = ModelSpec(
                 name=model_name,
                 ollama_model=model_name,
+                lmstudio_model=lmstudio_model,
                 context_window=spec.context_window,
                 temperature=spec.temperature,
                 description=spec.description,

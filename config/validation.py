@@ -151,13 +151,13 @@ class ConfigValidator:
         try:
             import ollama as _ollama
             from config.llm_client import get_ollama_host
-            from config.models import MODEL_CONFIGS
+            from config.models import ModelConfig
 
             host = get_ollama_host()
             client = _ollama.Client(host=host)
             pulled = {m["name"] for m in client.list().get("models", [])}
 
-            required = {spec.ollama_model for spec in MODEL_CONFIGS.values()}
+            required = {spec.ollama_model for spec in ModelConfig().configs.values()}
             missing = []
             for tag in required:
                 # Ollama list may include digest suffix; match by base tag

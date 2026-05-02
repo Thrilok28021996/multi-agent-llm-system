@@ -227,8 +227,8 @@ class CompanyWorkflow:
             removed = self.session_manager.cleanup_old_sessions()
             if removed > 0:
                 console.debug(f"Cleaned up {removed} old session(s)")
-        except Exception:
-            pass  # Non-critical
+        except Exception as e:
+            console.warning(f"Session cleanup failed (non-critical): {e}")
 
         # Hooks manager for lifecycle events
         from utils.hooks import HooksManager
@@ -382,11 +382,18 @@ class CompanyWorkflow:
             "SecurityEngineer": self.security_engineer
         }
 
-        # Ensure ReAct tools are enabled for developer and researcher
-        if hasattr(self.developer, 'enable_react_tools'):
-            self.developer.enable_react_tools()
-        if hasattr(self.researcher, 'enable_react_tools'):
-            self.researcher.enable_react_tools()
+        # Enable ReAct tools for all agents that need to call tools in their loops
+        for agent in [
+            self.developer,
+            self.researcher,
+            self.cto,
+            self.qa_engineer,
+            self.security_engineer,
+            self.devops_engineer,
+            self.data_analyst,
+        ]:
+            if hasattr(agent, 'enable_react_tools'):
+                agent.enable_react_tools()
 
     def _register_agents(self) -> None:
         """Register all agents with the message bus."""
@@ -577,6 +584,8 @@ class CompanyWorkflow:
                         console.error(f"Research phase failed after retries: {research_result.error}")
                 elif problem:
                     self.state.current_problem = problem
+                    self.state.artifacts["discovered_problems"] = [problem.to_dict()]
+                    self.state.artifacts["user_provided_problem"] = True
                     console.info("Using provided problem/requirement")
                     console.show_problem(problem.to_dict())
                 self.progress.complete_phase("research")
@@ -693,7 +702,8 @@ class CompanyWorkflow:
                                     target_users=p_dict.get("target_users", ""),
                                 )
                                 problem_objects.append(prob)
-                            except Exception:
+                            except Exception as e:
+                                console.warning(f"Skipping malformed problem dict during validation: {e}")
                                 continue
 
                         adjusted = self.problem_discoverer.apply_validation_adjustments(
@@ -1813,16 +1823,16 @@ class CompanyWorkflow:
                     event=HookEvent.ERROR,
                     metadata={"error": str(e)}
                 ))
-            except Exception:
-                pass
+            except Exception as hook_err:
+                console.warning(f"Error hook failed: {hook_err}")
 
         finally:
             # Trigger session end hook
             try:
                 session_id = self.session_manager.current_session.id if self.session_manager.current_session else ""
                 await self.hooks_manager.session_end(session_id)
-            except Exception:
-                pass
+            except Exception as hook_err:
+                console.warning(f"Session end hook failed: {hook_err}")
 
             # Cleanup: always stop background services and persist results
             self.health_checker.stop_background_checks()
@@ -1887,10 +1897,12 @@ class CompanyWorkflow:
         """Evaluate a quality gate. Returns (passed: bool, reason: str)."""
         if phase == "research":
             problems = self.state.artifacts.get("discovered_problems", [])
-            if len(problems) < 2:
-                return False, f"Only {len(problems)} problems found (need >= 2)"
+            user_provided = self.state.artifacts.get("user_provided_problem", False)
+            min_required = 1 if user_provided else 2
+            if len(problems) < min_required:
+                return False, f"Only {len(problems)} problems found (need >= {min_required})"
             max_score = max((p.get("score", 0) if isinstance(p, dict) else getattr(p, "score", 0)) for p in problems)
-            if max_score < 0.3:
+            if not user_provided and max_score < 0.3:
                 return False, f"Max problem score {max_score:.2f} < 0.3"
             return True, ""
 
@@ -3698,7 +3710,8 @@ Code Execution Results: {execution_summary}{confidence_note}{cto_peer_note}
                         sources=p.get("sources", []),
                     )
                     problem_objects.append(prob)
-                except Exception:
+                except Exception as e:
+                    console.warning(f"Skipping malformed problem in data analysis phase: {e}")
                     continue
             if problem_objects:
                 counter_evidence = await self.problem_discoverer.discover_counter_evidence(problem_objects, top_n=3)

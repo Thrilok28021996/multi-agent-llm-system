@@ -3,16 +3,25 @@
 import asyncio
 import functools
 import json
+import os
 import random
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
+# Global semaphores — limit concurrent LLM calls across all agents.
+# LM Studio on 16GB RAM handles 1-2 concurrent requests well; beyond that queues spike.
+# LLM_MAX_CONCURRENCY env var allows tuning per host.
+_LLM_MAX_CONCURRENCY = int(os.getenv("LLM_MAX_CONCURRENCY", "2"))
+_LLM_SEMAPHORE = asyncio.Semaphore(_LLM_MAX_CONCURRENCY)
+_LLM_SYNC_SEMAPHORE = threading.Semaphore(_LLM_MAX_CONCURRENCY)
+
 from config.llm_client import get_llm_client
-from config.models import MODEL_CONFIGS
+from config.models import ModelConfig
 from config.roles import AgentRole
 
 from agents.thinking import ThinkingEngine, ThinkingDepth
@@ -259,7 +268,7 @@ class BaseAgent(ABC):
         self.name = config.name
         self.role = config.role
         self.model = config.model
-        self.model_spec = MODEL_CONFIGS.get(config.role)
+        self.model_spec = ModelConfig().get_model(config.role)
         self.first_principles = config.first_principles
         self.system_prompt = config.system_prompt
         # Initialize memory
@@ -767,13 +776,24 @@ COGNITIVE DISCIPLINE:
             if rag_context:
                 messages.insert(1, {"role": "system", "content": rag_context})
 
-        # Apply first principles if needed
+        # Apply first principles if needed.
+        # Only invoke a full LLM `think()` call for complex prompts; otherwise
+        # fall back to the template-based `structured_think` (no extra LLM call)
+        # to avoid doubling latency on every invocation.
         if use_first_principles:
-            thinking = self.think(prompt)
-            messages.append({
-                "role": "assistant",
-                "content": f"[My Analysis]\n{thinking}\n\n[My Response]"
-            })
+            complexity = self._detect_complexity(prompt)
+            if complexity == "complex":
+                thinking = self.think(prompt)
+            else:
+                try:
+                    thinking = self.structured_think(prompt)
+                except Exception:
+                    thinking = ""
+            if thinking:
+                messages.append({
+                    "role": "assistant",
+                    "content": f"[My Analysis]\n{thinking}\n\n[My Response]"
+                })
 
         # Add context if provided
         if context:
@@ -817,9 +837,21 @@ COGNITIVE DISCIPLINE:
             if answer_block:
                 result = answer_block
 
-        # Verify first principles compliance (lightweight, no LLM call)
+        # Verify first principles compliance (lightweight, no LLM call).
+        # We only trigger an actual LLM retry when the response shows NO reasoning
+        # at all (zero indicators) or is too short to contain reasoning. Missing
+        # [EVIDENCE]/[ASSUMPTION] tags alone are logged but do not force a retry —
+        # local models rarely emit them and the wasted LLM call is expensive.
         if use_first_principles:
             compliant, fp_issues = self._verify_first_principles(result, prompt)
+            # Compute reasoning-indicator score independently of tag presence.
+            reasoning_indicators = [
+                "because", "therefore", "since", "given that", "considering",
+                "analysis", "reason", "evidence", "based on", "fundamentally",
+                "first principle", "core issue", "assumption"
+            ]
+            result_lower = (result or "").lower()
+            reasoning_score = sum(1 for ind in reasoning_indicators if ind in result_lower)
             # Store score on agent for TaskResult wiring (1.0 = fully compliant, 0.5 = partial)
             self._last_fp_score = 1.0 if compliant else 0.5
             # Track compliance in experience and learning systems
@@ -833,7 +865,13 @@ COGNITIVE DISCIPLINE:
                     outcome=fp_issues,
                     success=False,
                 )
-            if not compliant and len(result) > 100:
+            console.debug(
+                f"[FP] {self.name} reasoning_score={reasoning_score} "
+                f"len={len(result or '')} compliant={compliant}"
+            )
+            # Only retry when the response truly lacks reasoning, not just tags.
+            needs_retry = (reasoning_score == 0) or (len(result or "") < 50)
+            if needs_retry:
                 # Re-prompt with explicit principle guidance (one retry only)
                 principles_text = "\n".join(
                     f"  - {p}" for p in self.first_principles
@@ -907,11 +945,24 @@ COGNITIVE DISCIPLINE:
         system_messages = [m for m in messages if m.get("role") == "system"]
         non_system = [m for m in messages if m.get("role") != "system"]
 
+        # Pin the first non-system message (original task) so it isn't dropped
+        # — losing the original task causes severe agent drift mid-conversation.
+        first_user_msg = non_system[0] if non_system else None
+
         # Keep last 4 non-system messages; drop the middle
         if len(non_system) > 4:
-            kept = non_system[-4:]
+            last_kept = non_system[-4:]
         else:
-            kept = non_system
+            last_kept = non_system
+
+        # Build trimmed list: system + first_user + last_N (deduped)
+        kept: List[Dict[str, str]] = []
+        if first_user_msg is not None:
+            kept.append(first_user_msg)
+        for m in last_kept:
+            if m is first_user_msg:
+                continue
+            kept.append(m)
 
         trimmed = system_messages + kept
         new_estimated = sum(len(m.get("content", "")) // 4 for m in trimmed)
@@ -945,12 +996,13 @@ COGNITIVE DISCIPLINE:
         for attempt in range(max_retries + 1):
             try:
                 t0 = time.time()
-                text, input_tokens, output_tokens = get_llm_client().chat(
-                    self.model_spec,
-                    messages,
-                    temperature=self.config.temperature,
-                    max_tokens=self.config.max_tokens,
-                )
+                with _LLM_SYNC_SEMAPHORE:
+                    text, input_tokens, output_tokens = get_llm_client().chat(
+                        self.model_spec,
+                        messages,
+                        temperature=self.config.temperature,
+                        max_tokens=self.config.max_tokens,
+                    )
                 if input_tokens or output_tokens:
                     track_usage(
                         model=self.model_spec.name,
@@ -1056,6 +1108,8 @@ COGNITIVE DISCIPLINE:
     def receive_message(self, message: Message) -> None:
         """Receive a message from another agent."""
         self.inbox.append(message)
+        content_preview = message.content[:100].replace("\n", " ")
+        print(f"[INBOX]  {self.name} ◄── {message.sender}  [{message.message_type.upper()}]  \"{content_preview}\"")
         self.memory.add_to_conversation(
             "user",
             f"[Message from {message.sender}] {message.content}"
@@ -1080,6 +1134,8 @@ COGNITIVE DISCIPLINE:
         )
 
         self.outbox.append(message)
+        content_preview = content[:100].replace("\n", " ")
+        print(f"[OUTBOX] {self.name} ──► {recipient}  [{message_type.upper()}]  \"{content_preview}\"")
         self.memory.add_to_conversation(
             "assistant",
             f"[Message to {recipient}] {content}"
@@ -1251,7 +1307,7 @@ My reflection:
         return {
             "model": self.model,
             "backend": backend,
-            "ollama_model": self.model_spec.ollama_model if self.model_spec else None,
+            "model_id": self.model_spec.model_id(get_llm_client()._backend) if self.model_spec else None,
             "model_spec_configured": self.model_spec is not None,
         }
 
@@ -1306,11 +1362,12 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
         streaming: bool = False,
         stream_callback: Optional[Callable[[str], None]] = None
     ) -> str:
-        """Async version of generate_response."""
-        return await asyncio.to_thread(
-            self.generate_response, prompt, context, use_first_principles,
-            streaming, stream_callback
-        )
+        """Async version of generate_response — rate-limited to avoid overwhelming LM Studio."""
+        async with _LLM_SEMAPHORE:
+            return await asyncio.to_thread(
+                self.generate_response, prompt, context, use_first_principles,
+                streaming, stream_callback
+            )
 
     # ============================================================
     #  TECHNIQUE 3 — CHAIN-OF-THOUGHT PARSING
