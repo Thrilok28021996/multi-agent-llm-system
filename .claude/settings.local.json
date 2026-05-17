@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 main.py --check-models)"
+      "Bash(python3 main.py --check-models)",
+      "Bash(python3 *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(python *)",
+      "Skill(superpowers:systematic-debugging)"
     ]
   }
 }

@@ -5,57 +5,38 @@ from typing import Any, Dict, List, Optional
 from .base_agent import BaseAgent, AgentConfig, AgentRole, TaskResult
 from .agent_tools_mixin import AgentToolsMixin
 from research.problem_statement_refiner import ProblemStatementRefiner
+from tools import UnifiedTools
 from ui.console import console
 
 
-DATA_ANALYST_SYSTEM_PROMPT = """You are the Data Analyst. You cross-validate research findings, detect biases, deduplicate data, and score the credibility of sources and claims.
+DATA_ANALYST_SYSTEM_PROMPT = """You are the Data Analyst. You cross-validate research findings, detect biases, and score credibility.
 
-Statistical Rigor: Sample size matters. 5 Reddit posts is not a trend. 50 might be. State confidence levels with your findings.
+Your job:
+- Confirm, partially confirm, contradict, or mark unconfirmed each finding based on evidence quality.
+- For every finding you confirm, find at least one credible counter-argument. If you find none, your search was insufficient.
+- Sources sharing the same platform or community are NOT independent — they count as one.
 
-Contrarian Mandate: For every finding you confirm, you MUST find at least one credible counter-argument or contradicting data point. If you cannot find any, your search was not thorough enough.
+Verdict system:
+- CONFIRMED: N ≥ 10 distinct reports, median age ≤ 60 days, ≥ 2 independent platforms.
+- PARTIALLY_CONFIRMED: Some corroboration but below CONFIRMED threshold.
+- UNCONFIRMED: Single source or conflicting evidence.
+- CONTRADICTED: Sources actively disagree. Flag for investigation.
 
-Source Independence Verification: Two Reddit posts in the same subreddit are NOT independent sources. They share the same community bias. True independence requires different platforms, different user demographics.
+Required output per finding — every analysis must state:
+N: [sample size] | DATE RANGE: [oldest to newest] | PLATFORMS: [list] | CONFIDENCE: [0.0-1.0] | VERDICT: [one sentence]
 
-Quantitative Over Qualitative: Prefer numbers over opinions. "Many users complain" is weak. "47 posts in 30 days across 3 platforms with 2,300 upvotes" is strong.
-
-Missing Data Awareness: What data would DISPROVE this finding? If that data does not exist or was not checked, the finding is incomplete. State what is missing explicitly.
-
-Freshness Scoring: Score data by freshness: <1 month = HIGH, 1-3 months = MEDIUM, 3-6 months = LOW, >6 months = STALE. Weight fresh data higher.
-
-Your verdict system for cross-validation:
-- CONFIRMED: Multiple independent sources agree. High confidence.
-- PARTIALLY_CONFIRMED: Some corroboration but gaps exist. Medium confidence.
-- UNCONFIRMED: Single source only or conflicting evidence. Low confidence.
-- CONTRADICTED: Sources actively disagree. Requires investigation.
-
-Judgment guidelines:
-- Be skeptical but not cynical. Absence of evidence is not evidence of absence.
-- Weight official documentation and peer-reviewed sources higher than forums and blogs.
-- Recency matters: a 2024 finding may invalidate a 2020 conclusion.
-- Always quantify confidence as a score from 0.0 to 1.0.
-- When bias is detected, explain which direction it pulls the conclusion.
-
-Recency Weighting: Data from the last 7 days is worth 3x data from 30+ days ago. When scoring confidence, weight by freshness explicitly.
-
-Platform Bias Map: Reddit skews toward developers. HackerNews skews toward startups. StackOverflow skews toward beginners. GitHub issues skew toward power users. State which platforms your data comes from and how that biases the conclusion.
-
-Quantitative Output: Every analysis must include: N (sample size), date range, platform distribution, confidence score (0-1), and a one-sentence verdict.
-
-Statistical Rigor Enforcement: Every claim needs: sample size (N), date range, platform distribution. Claims without these are UNCONFIRMED by default.
-
-Survivorship Bias Check: Are you only seeing successful examples? What about the failures? Search for '[topic] failed' and '[topic] problems'.
-
-Correlation vs Causation Gate: For every causal claim, state: Could this be correlation? What confounding variables exist?
-
-Minimum Evidence Standard: Before marking any finding CONFIRMED, require: (1) N ≥ 10 distinct reports, (2) majority age ≤ 90 days, (3) at least 2 independent platforms. Findings below this threshold are PARTIALLY_CONFIRMED at most, regardless of how compelling the story seems.
+Freshness: data <30 days = HIGH weight, 30-60 days = MEDIUM, >60 days = STALE (flag before using).
+Platform bias: Reddit → developers. HackerNews → startups. StackOverflow → beginners. GitHub issues → power users. State which platforms and how they bias the conclusion.
+Survivorship bias: also search for '[topic] failed' and '[topic] problems' — do not only see successes.
+Causation gate: for every causal claim, state whether it could be correlation and what confounds exist.
 """
 
 DATA_ANALYST_FIRST_PRINCIPLES = [
-    "COUNTER-EVIDENCE HUNT: Before confirming any finding, spend equal effort trying to DISPROVE it. What evidence would make this wrong? Did you look for it?",
-    "INDEPENDENCE MATRIX: Build a source independence matrix. For each pair of sources, answer: Do they share an audience? A platform? A bias? Dependent sources count as ONE.",
-    "SAMPLE SIZE CHECK: State the N for every claim. N<10 = anecdotal. N<30 = preliminary. N<100 = indicative. N>100 = potentially significant. Flag the level.",
-    "FRESHNESS AUDIT: Date-stamp every data point. Calculate median age. If median age >60 days, the finding needs re-validation with current data.",
-    "BIAS INVENTORY: For THIS specific topic, list the 3 most likely biases. For each, explain how you controlled for it. If you did not, flag the finding as potentially biased.",
+    "COUNTER-EVIDENCE: Before confirming, spend equal effort disproving. What evidence would make this finding wrong? Did you look for it?",
+    "INDEPENDENCE CHECK: For each source pair — shared platform or audience? If yes, they count as ONE. True independence requires different platforms and demographics.",
+    "SAMPLE SIZE: N<10 = anecdotal, N<30 = preliminary, N<100 = indicative, N≥100 = significant. State the level explicitly.",
+    "FRESHNESS: Median age of data points >60 days = flag the finding as potentially stale before issuing CONFIRMED.",
+    "BIAS INVENTORY: For this specific topic, name the 3 most likely biases and how each was controlled. Uncontrolled bias = flag the finding.",
 ]
 
 
@@ -84,6 +65,9 @@ class DataAnalystAgent(BaseAgent, AgentToolsMixin):
             max_tokens=4096
         )
         super().__init__(config, workspace_root, memory_persist_dir)
+
+        self.tools = UnifiedTools(workspace_root=workspace_root, persist_dir=memory_persist_dir)
+        self.enable_react_tools()
 
         # Problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -184,11 +168,7 @@ For each finding, determine:
    - List all claims that rely on a single source.
    - For each, note the risk and what additional evidence would help.
 
-4. CROSS-VALIDATION MATRIX
-   For each claim, show which sources support/contradict/are silent:
-   | Claim | Source 1 | Source 2 | ... | Status |
-
-5. CONFIDENCE ASSESSMENT
+4. CONFIDENCE ASSESSMENT
    - Overall research confidence: 0.0 to 1.0
    - Per-finding confidence scores
    - Key gaps in validation
@@ -713,22 +693,12 @@ Reason: [one sentence]
 
     def compare_sources(self, source_a: str, source_b: str) -> str:
         """Compare two sources for consistency."""
-        prompt = f"""
-Compare these two sources for consistency:
+        prompt = f"""Compare these sources for consistency.
 
-Source A:
-{source_a}
+Source A: {source_a}
+Source B: {source_b}
 
-Source B:
-{source_b}
-
-Identify:
-1. Points of agreement
-2. Points of contradiction
-3. Information unique to each source
-4. Which source appears more reliable and why
-
-Be concise.
+State: agreements, contradictions, unique info in each, and which is more reliable and why.
 """
         return self.generate_response(prompt, use_first_principles=True)
 

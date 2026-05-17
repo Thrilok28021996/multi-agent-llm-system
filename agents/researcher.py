@@ -14,50 +14,35 @@ from ui.console import console
 RESEARCHER_SYSTEM_PROMPT = """You are the Lead Researcher. You discover and validate problems worth solving.
 
 Your job:
-- Find real problems from user feedback, forums, and web sources.
-- Separate signal from noise — widespread pain vs. one-off complaints.
-- Validate that a problem is real, common, and worth building a solution for.
+- Find real problems with multiple independent reports, failed workarounds, and measurable impact.
+- Separate signal from noise: a problem affecting 100 users daily beats one affecting 10,000 users annually.
+- For user-provided problems: validate scope and target users only — do not question whether the problem exists.
+- For auto-discovered problems: require evidence from at least 2 independent platforms.
 
-Investigative Rigor: Treat every problem claim like a journalist treats a source: verify independently, look for corroboration, identify who benefits from the narrative.
+Signal criteria (a real problem has ALL three):
+1. Multiple independent reports (different platforms, different users)
+2. Failed workarounds — people tried to solve it and could not
+3. Measurable impact — time wasted, money lost, or users churned
 
-Signal vs Noise: A real problem has: (1) Multiple independent reports, (2) Failed workarounds (people tried to solve it and could not), (3) Measurable impact (time wasted, money lost, users churned).
+Source quality: Primary (user's own experience) > Secondary (reported by others) > Tertiary (aggregated).
+For every claim: state who said it, when, on what platform, and how many agreed. No date = reject the source.
+Trace every claim to its primary source — blog posts citing other blogs have low credibility.
 
-Source Quality Hierarchy: Primary sources (user's own experience) > Secondary sources (reported by someone else) > Tertiary sources (aggregated/summarized). Weight accordingly.
+Freshness: Discard problems with no reports in the last 60 days unless you verify the problem is still unsolved.
+After finding evidence FOR a problem, check for evidence it is already solved. Report both sides.
 
-Anti-Popularity Bias: Popular complaints are not always important problems. A problem affecting 100 developers daily is more valuable than one affecting 10,000 developers annually.
+Existing solutions: Name 2-3 existing solutions, what each does well, and where each fails. Our solution must address the specific failures.
 
-Freshness Requirement: Problems from >6 months ago may be solved already. Always check if recent solutions exist before validating.
-
-Problem Decomposition: Every complex problem is actually 3-5 smaller problems. Identify the atomic problems and validate each independently.
-
-Validation rules:
-- For user-provided problems: The user has chosen this. Validate scope and target users, not whether it exists.
-- For auto-discovered problems: Be skeptical. Look for evidence across multiple sources.
-- For ALL problems: Rank by severity x frequency x feasibility.
-
-Temporal Validation: For every problem, find the MOST RECENT mention (within 30 days). If no recent mentions exist, the problem may be solved. Check release notes of major tools in the space.
-
-Counter-Research: After finding evidence FOR a problem, spend equal time searching for evidence that the problem is ALREADY SOLVED. Report both sides.
-
-Data Provenance: For every claim, state: Who said it? When? On what platform? How many people agreed? A claim without provenance is not evidence.
-
-Date-Stamping Requirement: Every data point MUST include its date. Reject any source without a visible date.
-
-Primary Source Preference: Always trace claims to the PRIMARY source. Blog posts citing other blogs have low credibility.
-
-Market Sizing: For every problem, estimate: How many people have this problem? How much would they pay to solve it?
-
-Competitive Landscape: Name 3 existing solutions. For each: what it does well, what it does poorly, and its pricing.
-
-Synthesis Requirement: After gathering all data, write a one-paragraph synthesis stating: the problem, who has it, how severe it is, what existing solutions fail at, and what a better solution would do. Raw data without synthesis is not research — it is noise.
+Required output — end every research response with this synthesis paragraph:
+SYNTHESIS: [problem] affects [who] with severity [low/medium/high]. Existing solutions fail at [specific gaps]. A better solution would [specific improvement]. Confidence: [0.0-1.0].
 """
 
 RESEARCHER_FIRST_PRINCIPLES = [
-    "SOURCE INDEPENDENCE: Are sources truly independent? Same community = same bias. Reddit + HN may both reflect the same developer echo chamber.",
-    "WORKAROUND CHECK: What do people currently do about this? If good workarounds exist, the problem is not painful enough. No workarounds = high pain.",
-    "QUANTIFY IMPACT: Convert pain to numbers. How many hours/week wasted? How much money lost? How many users affected? No numbers = insufficient research.",
-    "RECENCY CHECK: When was this problem last reported? If >3 months old with no recent mentions, it may be solved. Verify current status.",
-    "BIAS SELF-CHECK: Am I drawn to this problem because it is interesting to ME or because the evidence shows it is impactful to USERS? These are different.",
+    "SOURCE INDEPENDENCE: Are sources truly independent? Same platform or community = shared bias. Reddit + HN can reflect the same echo chamber — they count as ONE source.",
+    "WORKAROUND CHECK: What do users currently do about this? Strong existing workarounds = low pain. No workarounds = high pain and unmet need.",
+    "QUANTIFY IMPACT: Express pain as numbers — hours/week wasted, users affected, error frequency. Qualitative-only = insufficient.",
+    "FRESHNESS CHECK: Is there a report from within the last 60 days? If not, verify the problem is still unsolved before proceeding.",
+    "BIAS CHECK: Am I validating this problem because the evidence supports it, or because it is interesting to me? If the evidence is thin, say so explicitly.",
 ]
 
 
@@ -145,36 +130,20 @@ class ResearcherAgent(BaseAgent, AgentToolsMixin):
         domain = task.get("domain", "general")
         raw_content = task.get("content", "")
 
-        prompt = f"""
-As Lead Researcher, I'm analyzing content to discover user problems.
+        prompt = f"""Identify user problems in this content.
 
-Domain Focus: {domain}
+Domain: {domain}
 Sources: {', '.join(sources) if sources else 'Various'}
 
-Content to Analyze:
+Content:
 {raw_content}
 
-Please identify:
-
-1. PROBLEMS DISCOVERED
-For each problem found:
-- Description: What is the problem?
-- Severity: Low/Medium/High/Critical
-- Frequency: Rare/Occasional/Common/Very Common
-- Target Users: Who experiences this?
-- Evidence: What quotes/data support this?
-- Root Cause: What's the underlying issue?
-
-2. PATTERNS OBSERVED
-- Common themes across complaints
-- Recurring frustrations
-- Unmet needs
-
-3. OPPORTUNITIES
-- Which problems are worth solving?
-- Market opportunity assessment
-
-Format as structured data that can be processed further.
+For each problem found, output:
+PROBLEM: [description]
+SEVERITY: Low|Medium|High|Critical
+FREQUENCY: Rare|Occasional|Common|Very Common
+TARGET_USERS: [who experiences this]
+EVIDENCE: [supporting quote or data]
 """
 
         response = await self.generate_response_async(prompt)
@@ -200,17 +169,9 @@ Format as structured data that can be processed further.
         content = task.get("content", "")
         analysis_type = task.get("analysis_type", "pain_points")
 
-        prompt = f"""
-Analyze this content for {analysis_type}:
+        prompt = f"""Analyze for {analysis_type}. State key findings, main themes, and confidence level.
 
 {content}
-
-Provide:
-1. Key findings
-2. Sentiment analysis
-3. Main themes
-4. Actionable insights
-5. Confidence level in findings
 """
 
         response = await self.generate_response_async(prompt)
@@ -225,20 +186,9 @@ Provide:
         topic = task.get("topic", "")
         depth = task.get("depth", "standard")  # quick, standard, deep
 
-        prompt = f"""
-Research this topic in depth ({depth} analysis):
+        prompt = f"""Research: {topic} ({depth} analysis)
 
-Topic: {topic}
-{self._get_problem_preamble("research_topic")}
-Provide:
-1. Overview of the topic
-2. Current state/trends
-3. Key players/solutions
-4. Common problems in this space
-5. Gaps and opportunities
-6. Recommendations for our company
-
-Base this on your knowledge and any provided context.
+Cover: current state, key solutions, common problems, and unsolved gaps.
 """
 
         response = await self.generate_response_async(prompt)
@@ -257,22 +207,10 @@ Base this on your knowledge and any provided context.
         space = task.get("space", "")
         competitors = task.get("competitors", [])
 
-        prompt = f"""
-Conduct competitive analysis for this space:
+        prompt = f"""Competitive analysis: {space}
+Competitors: {', '.join(competitors) if competitors else 'identify key players'}
 
-Space/Market: {space}
-Known Competitors: {', '.join(competitors) if competitors else 'Please identify key players'}
-
-Analyze:
-1. Key competitors and their positioning
-2. Strengths and weaknesses of each
-3. Pricing models
-4. Feature comparison
-5. Market gaps/opportunities
-6. How we could differentiate
-7. Barriers to entry
-
-Provide strategic competitive insights.
+For each: positioning, strengths, weaknesses. Then: market gaps and our differentiation opportunity.
 """
 
         response = await self.generate_response_async(prompt)
@@ -324,11 +262,15 @@ Be concise (3-5 sentences max)."""
 
         response = await self.generate_response_async(prompt)
 
-        # Parse validation status
-        if "VALIDATED" in response.upper() and "PARTIALLY" not in response.upper():
-            status = "validated"
-        elif "PARTIALLY" in response.upper():
+        # Parse validation status — check NOT_VALIDATED before VALIDATED to avoid substring match
+        import re as _re
+        verdict_region = response[-300:].upper()
+        if _re.search(r'\bNOT[_ ]?VALIDATED\b', verdict_region):
+            status = "not_validated"
+        elif _re.search(r'\bPARTIALLY', verdict_region):
             status = "partially_validated"
+        elif _re.search(r'\bVALIDATED\b', verdict_region):
+            status = "validated"
         else:
             status = "not_validated"
 
@@ -347,7 +289,7 @@ Be concise (3-5 sentences max)."""
         description = task.get("description", "")
 
         response = await self.generate_response_async(
-            f"As Lead Researcher, please address: {description}"
+            f"Research task: {description}"
         )
 
         return TaskResult(
@@ -447,17 +389,11 @@ Be concise (3-5 sentences max)."""
             for i, f in enumerate(findings)
         )
 
-        prompt = f"""
-Synthesize these research findings into a cohesive report:
+        prompt = f"""Synthesize into a research report.
 
 {findings_text}
 
-Provide:
-1. Executive summary
-2. Key themes and patterns
-3. Most significant problems discovered
-4. Recommendations for next steps
-5. Areas needing more research
+Output: executive summary, key themes, top problems found, recommended next steps.
 """
         return self.generate_response(prompt)
 
@@ -468,19 +404,11 @@ Provide:
             for i, p in enumerate(problems)
         )
 
-        prompt = f"""
-Rank these problems by potential business value:
+        prompt = f"""Rank by business value (severity, audience size, willingness to pay, feasibility, competition):
 
 {problems_text}
 
-Consider:
-- Severity of the problem
-- Size of affected audience
-- Willingness to pay for solution
-- Feasibility to solve
-- Competitive landscape
-
-Return ranked list with scores and reasoning.
+Return ranked list with score and one-sentence reasoning per problem.
 """
         response = self.generate_response(prompt)
 

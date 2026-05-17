@@ -5,54 +5,41 @@ from typing import Any, Dict, List, Optional
 from .base_agent import BaseAgent, AgentConfig, AgentRole, TaskResult
 from .agent_tools_mixin import AgentToolsMixin
 from research.problem_statement_refiner import ProblemStatementRefiner
+from tools import UnifiedTools
 from ui.console import console
 from utils.enhanced_review_system import EnhancedReviewSystem
 
 
 QA_SYSTEM_PROMPT = """You are the QA Engineer. You validate that solutions work and meet requirements.
 
-Testing Methodology: Apply systematic testing: (1) Happy path — does the basic case work? (2) Boundary values — what about edge cases? (3) Error cases — what about invalid input? (4) Integration — do components work together?
+Testing sequence:
+1. Happy path first — does the core use case work end-to-end? If not, FAIL immediately.
+2. Requirements coverage — for each PM requirement: implemented? works? evidence?
+3. Edge cases — empty input, null, maximum size, special characters, unicode.
+4. Regression — do previously passing tests still pass after this change?
+5. User journey — install from README → configure → first use → error recovery. Each step must work.
 
-Bug Classification Rigor: Classify with precision — CRITICAL: data loss, security hole, crash on happy path. MAJOR: feature does not work as specified. MINOR: cosmetic, non-blocking UX issue. TRIVIAL: style preference.
+Bug severity:
+- CRITICAL: data loss, security hole, crash on happy path
+- MAJOR: feature does not work as specified
+- MINOR: cosmetic or non-blocking UX issue (shippable)
+- TRIVIAL: style preference
 
-Requirements Traceability: For EACH requirement from the PM, verify: (1) Is it implemented? (2) Does it work correctly? (3) What is the evidence? Map every requirement to a test result.
+Verdict system:
+- PASS: Works, meets core requirements.
+- PASS_WITH_ISSUES: Works but has MINOR issues. Still shippable.
+- FAIL: Does not work or misses a core requirement. Every FAIL must include: expected, actual, steps to reproduce, suggested fix.
 
-Regression Awareness: When code is changed to fix one issue, verify that previously working features still work. Fixing A should not break B.
-
-Anti-Perfectionism Balance: Your job is to ensure quality, not to achieve perfection. A working MVP with known minor issues is shippable. A perfect solution that takes forever is not.
-
-Evidence-Based Verdicts: Every FAIL must include: (1) What was expected, (2) What actually happened, (3) Steps to reproduce, (4) Suggested fix. A FAIL without reproduction steps is not useful.
-
-Your verdict system:
-- PASS: Solution works and meets the core requirements. Ship it.
-- PASS_WITH_ISSUES: Solution works but has minor issues (cosmetic, non-blocking). Still shippable.
-- FAIL: Solution does not work or fundamentally misses the requirements. Must be fixed.
-
-Focus on: does it work? Can a user run it? Does it solve the problem? Everything else is secondary.
-
-Execution-First Validation: ALWAYS try to run the code before reviewing it. A code review without execution is opinion. Execution results are evidence.
-
-Regression Tracking: Keep a running list of previously-passed tests. When new code is submitted, verify ALL previous passes still hold. New fixes that break old features = FAIL.
-
-User Journey Testing: Test the complete user journey: install → configure → first use → common use → error recovery. Each step must work.
-
-Regression Suite: Maintain a running list of test cases. When code is modified, re-run ALL previous test cases. New fixes that break old features = FAIL.
-
-User Acceptance Testing: Test as the end user would: install from scratch, follow README, try the happy path. Document every step.
-
-Performance Baseline: Measure: startup time, memory usage, response time for main operation. Flag if any exceeds reasonable limits for the project type.
-
-Test Repeatability: Every test described must be deterministic — run the same command, get the same result. Flaky tests (sometimes pass, sometimes fail) must be flagged and quarantined. A test that randomly passes is not evidence.
-
-Focus on structure validation and basic test scaffolding. Generate test stubs with clear descriptions of what each test should verify. Mark tests that need real implementation with # TODO: implement test logic.
+Execution first: run the code before reviewing it. Execution results are evidence; code review alone is opinion.
+Test repeatability: every test must be deterministic — same command, same result. A test that sometimes passes is not evidence.
 """
 
 QA_FIRST_PRINCIPLES = [
-    "REQUIREMENTS COVERAGE: List every PM requirement. For each, state: TESTED/UNTESTED and PASS/FAIL. 100% coverage before any verdict.",
-    "HAPPY PATH FIRST: Run the main use case mentally. Does it work start to finish? If the happy path fails, everything else is irrelevant — immediate FAIL.",
-    "EDGE CASE SWEEP: For every input, test: empty, null, maximum size, special characters, unicode, negative numbers (where applicable). List which ones fail.",
-    "ERROR MESSAGE QUALITY: When the code fails, does it tell the user what went wrong and how to fix it? Cryptic errors = MAJOR issue.",
-    "VERDICT INTEGRITY: Am I passing this because it is genuinely good, or because I want the loop to end? Quality fatigue = call it out and escalate, do not lower standards.",
+    "HAPPY PATH FIRST: Does the main use case work start to finish? If not, stop — immediate FAIL. Everything else is irrelevant if this fails.",
+    "REQUIREMENTS MAP: List every PM requirement. For each: TESTED or UNTESTED, and PASS or FAIL. 100% coverage required before issuing any verdict.",
+    "EDGE CASE SWEEP: For each input field — test empty, null, maximum, special characters. List which fail and their severity.",
+    "ERROR QUALITY: When the code fails, does it tell the user what went wrong and how to fix it? Cryptic tracebacks = MAJOR issue.",
+    "VERDICT INTEGRITY: Am I passing this because it is genuinely good, or because I want the loop to end? If fatigued, escalate — do not lower the bar.",
 ]
 
 
@@ -80,6 +67,9 @@ class QAEngineerAgent(BaseAgent, AgentToolsMixin):
             max_tokens=4096
         )
         super().__init__(config, workspace_root, memory_persist_dir)
+
+        self.tools = UnifiedTools(workspace_root=workspace_root, persist_dir=memory_persist_dir)
+        self.enable_react_tools()
 
         # Track found issues
         self.found_issues: List[Dict[str, Any]] = []
@@ -136,45 +126,17 @@ class QAEngineerAgent(BaseAgent, AgentToolsMixin):
         requirements = task.get("requirements", "")
         scope = task.get("scope", "comprehensive")
 
-        prompt = f"""
-Create a test plan for this feature:
+        prompt = f"""Create a {scope} test plan.
 
-Feature: {feature.get('name', 'Unknown')}
-Description: {feature.get('description', '')}
-
+Feature: {feature.get('name', 'Unknown')} — {feature.get('description', '')}
 Requirements:
 {requirements}
 
-Scope: {scope}
-
-Provide a comprehensive test plan including:
-
-1. TEST STRATEGY
-   - Testing approach
-   - Types of testing needed
-   - Testing priorities
-
-2. TEST CASES
-   For each test case:
-   - Test ID
-   - Description
-   - Preconditions
-   - Steps
-   - Expected result
-   - Priority (P0/P1/P2/P3)
-
-3. EDGE CASES
-   - Boundary conditions
-   - Error conditions
-   - Unusual inputs
-
-4. TEST DATA
-   - Required test data
-   - Test environment needs
-
-5. ACCEPTANCE CRITERIA
-   - Pass/fail criteria
-   - Coverage requirements
+Output:
+1. Test strategy (approach, test types, priorities)
+2. Test cases (ID, steps, expected result, priority P0-P3)
+3. Edge cases (boundaries, error conditions, unusual inputs)
+4. Acceptance criteria (pass/fail, coverage)
 """
 
         response = await self.generate_response_async(prompt)
@@ -203,18 +165,11 @@ Provide a comprehensive test plan including:
         # Analyze test output
         output = result.get("stdout", "") + result.get("stderr", "")
 
-        prompt = f"""
-Analyze these test results:
+        prompt = f"""Analyze these test results. State totals, failed test analysis, and verdict: PASS / FAIL.
 
 ```
 {output}
 ```
-
-Provide:
-1. Summary (total tests, passed, failed, skipped)
-2. Failed tests analysis (if any)
-3. Recommendations
-4. Overall verdict: PASS / FAIL
 """
 
         analysis = await self.generate_response_async(prompt)
@@ -324,7 +279,6 @@ Provide:
             files = solution.get('files', {})
 
             all_issues = []
-            meets_all_requirements = True
 
             for file_path, code_content in files.items():
                 console.info(f"  Reviewing {file_path}...")
@@ -343,9 +297,6 @@ Provide:
                 )
 
                 all_issues.extend(review_result.suggestions)
-
-                if not review_result.meets_requirements:
-                    meets_all_requirements = False
 
             console.info(f"Code review complete - {len(all_issues)} issues found")
 
@@ -440,9 +391,9 @@ Answer each question with YES, NO, or N/A:
 VERDICT RULES (follow EXACTLY):
 - Q1=YES, Q2=YES, Q3=YES, Q4=YES or N/A → PASS
 - Q1=YES, Q2=YES, Q3=YES, Q4=NO → FAIL (code crashes)
-- Q1=YES, Q2=YES, Q3=NO → PASS_WITH_ISSUES (works but not perfectly runnable)
+- Q1=YES, Q2=YES, Q3=NO, Q4=YES or N/A → PASS_WITH_ISSUES (works but not perfectly runnable)
+- Q1=YES, Q2=YES, Q3=NO, Q4=NO → FAIL (code crashes and is not perfectly runnable)
 - Q1=NO or Q2=NO → FAIL (core problem unsolved or no code exists)
-- 3 of 4 YES and the NO is Q3 → PASS_WITH_ISSUES
 - Any other combination → FAIL with specific blocking issues listed
 
 ROOT_CAUSE_ADDRESSED: YES|NO
@@ -617,26 +568,12 @@ Code Execution Results:
 {f"- Test Output: {execution_results.get('test_output', '')}" if execution_results.get('test_output') else ""}
 """
 
-        prompt = f"""
-Generate a QA report for: {project}
+        prompt = f"""Generate QA report for: {project}
 
-Test Results:
-{test_results}
-
-Issues Found:
-{issues_text if issues else 'No issues found'}
+Test Results: {test_results}
+Issues Found: {issues_text if issues else 'No issues found'}
 {execution_section}
-Generate a comprehensive QA report including:
-1. Executive Summary
-2. Testing Coverage
-3. Code Execution Results
-4. Issues Summary (by severity)
-5. Detailed Issue List
-6. Risk Assessment
-7. Recommendations
-8. Release Readiness: READY / NOT_READY / CONDITIONAL
-
-Format as a professional QA report.
+Include: executive summary, issues by severity, risk assessment, recommendations, and release readiness verdict: READY / NOT_READY / CONDITIONAL.
 """
 
         response = await self.generate_response_async(prompt)
@@ -751,33 +688,17 @@ List only clear bugs, security issues, or quality problems. Be concise.
 
     def suggest_test_cases(self, function_description: str) -> str:
         """Suggest test cases for a function."""
-        prompt = f"""
-Suggest test cases for this function:
+        prompt = f"""Suggest test cases (happy path, edge cases, error cases, boundary values) for:
 
 {function_description}
-
-Provide:
-- Happy path tests
-- Edge cases
-- Error cases
-- Boundary value tests
-
-Format as a simple list.
 """
         return self.generate_response(prompt)
 
     def assess_risk(self, change_description: str) -> Dict[str, Any]:
         """Assess risk of a change."""
-        prompt = f"""
-Assess the risk of this change:
+        prompt = f"""Assess risk of this change. State: Risk Level (Low/Medium/High/Critical), main risks, testing needed, rollback plan.
 
 {change_description}
-
-Provide:
-1. Risk Level: Low/Medium/High/Critical
-2. Main risks
-3. Testing recommendations
-4. Rollback considerations
 """
         response = self.generate_response(prompt, use_first_principles=True)
 

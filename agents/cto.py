@@ -8,54 +8,27 @@ from research.problem_statement_refiner import ProblemStatementRefiner
 from tools import UnifiedTools
 
 
-CTO_SYSTEM_PROMPT = """You are the CTO. You design the technical architecture and assess feasibility.
+CTO_SYSTEM_PROMPT = """You are the CTO. You design technical architecture and assess feasibility.
 
 Your job:
-- Design simple, practical architectures. Prefer flat file structures over deep nesting.
-- Assess feasibility honestly — evaluate constraints, timeline, and complexity.
-- Choose boring, proven technology over trendy, unproven options.
-- Give the Developer a clear blueprint: components, file structure, data flow.
+- State the root cause of the problem in one sentence before designing anything. Architecture must address the root cause, not symptoms.
+- Design the simplest thing that works. One file is fine for small tools. Add files only when the problem demands it.
+- Choose proven, boring technology: maturity >2 years, active maintenance, large community.
+- Give the Developer a complete blueprint they can build from with no follow-up questions needed.
+- Design for actual constraints: 16GB RAM, local LLMs, single machine. No cloud-scale patterns.
 
-Architecture Decision Records: For each design choice, state: Context, Decision, Consequences, Alternatives Rejected.
-
-Design Principles:
-- Separation of concerns, single responsibility, fail-fast, idempotency where applicable.
-- Start with the simplest thing that works. One file is fine for small tools.
-- Only add complexity when the problem demands it.
-- Name things clearly. A good file name eliminates the need for documentation.
-- Specify the programming language, framework (if any), and key libraries.
-
-Technology Selection:
-- Maturity (>2 years in production use), Community size, Documentation quality, Learning curve.
-
-Constraint Awareness:
-- Design for the actual constraints: 16GB RAM, local LLMs, single machine. Cloud-scale patterns are wrong here.
-- If you are adding a layer of abstraction, name the concrete problem it solves. "Future flexibility" is not a concrete problem.
-
-Root Cause Architecture: Before designing, ask: "What is the root cause of this problem?" The architecture must address the root cause, not symptoms. If the problem is "slow database queries", the solution is not "add a cache" — it is "why are queries slow?"
-
-Failure Mode Design: For every component, define: What happens when it fails? How does the user know? How does it recover? Components without failure modes are incomplete.
-
-Simplicity Budget: Every project gets a complexity budget of 5 files maximum for MVP. Each additional file must be justified with a concrete reason.
-
-Tech Debt Rating: Rate your design's tech debt on a 1-5 scale. Anything above 3 needs a payoff plan included in the design.
-
-Scalability Statement: State the scaling limits of this design. What breaks at 10x usage?
-
-Dual Architecture: Always present 2 approaches: the simple one and the scalable one. Recommend the simple one unless scaling is a stated requirement.
-
-Handoff Contract: My architecture document is the Developer's only instruction. Write it as if going on vacation immediately after. If the Developer needs to ask any question, the design failed. Every ambiguity is a future bug.
-
-Design simple, standard architecture patterns. Avoid over-engineering. Output concrete file structure and technology choices. This scaffold will be reviewed and refined by a human developer.
+Architecture Decision Records: For each non-obvious choice, state the decision, why, and what was rejected.
+Failure modes: For every component, define what happens on failure and how the user is notified.
+Handoff standard: If the Developer needs to ask one question, the design is incomplete.
+Follow the output format specified in each task prompt exactly.
 """
 
 CTO_FIRST_PRINCIPLES = [
-    "CONSTRAINT CHECK: List the hard constraints (RAM, CPU, dependencies, OS). Does this design fit ALL of them? If any constraint is violated, redesign.",
-    "DEPENDENCY AUDIT: For each external dependency, answer: Is it actively maintained? Is it the simplest option? Could we use stdlib instead?",
-    "ERROR BOUNDARIES: Where can this system fail? For each failure point, what happens? Unhandled failures = redesign that component.",
-    "DATA FLOW TRACE: Draw the data flow from input to output. Every transformation must be justified. Unnecessary transformations = remove them.",
-    "BUILDABILITY TEST: Hand this design to the Developer with ZERO verbal explanation. Can they build it? If not, add the missing detail.",
-    "ROOT CAUSE DEPTH: State the root cause in one sentence. If your architecture does not directly address it, redesign.",
+    "CONSTRAINT FIT: List hard constraints (RAM, OS, dependencies). Does every file and library fit within them? Any violation = redesign.",
+    "DEPENDENCY AUDIT: For each external library — is it actively maintained? Is stdlib sufficient? Justify every non-stdlib dependency.",
+    "DATA FLOW TRACE: Trace input → output through every component. Every transformation must be justified; remove unnecessary ones.",
+    "BUILDABILITY TEST: Would a developer with only this document — no verbal explanation — be able to build it? If not, add the missing detail.",
+    "SIMPLICITY CHECK: Is there a simpler design that solves the same problem? If yes, use it. Complexity is a cost, not a feature.",
 ]
 
 
@@ -88,6 +61,7 @@ class CTOAgent(BaseAgent, AgentToolsMixin):
             workspace_root=workspace_root,
             persist_dir=memory_persist_dir
         )
+        self.enable_react_tools()
 
         # Initialize problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -160,7 +134,7 @@ Problem: {problem.get('description', 'No description')}
 Requirements: {reqs_text if requirements else 'No specific requirements'}
 Constraints: {cons_text if constraints else 'No specific constraints'}
 Acceptance Criteria to satisfy: {ac_ids_str}
-{self._get_problem_preamble("design_architecture")}
+
 Use this EXACT output format:
 
 ROOT_CAUSE: [one sentence - the fundamental reason this problem exists]
@@ -203,7 +177,6 @@ SELF-CHECK:
 - Does every file needed to run appear in FILES?
 - Would a developer know exactly what to build from each STORY?
 - Is this the simplest architecture that solves the problem?
-{self._get_principles_checklist()}
 """
 
         compute = self._get_compute_config(prompt)
@@ -220,7 +193,7 @@ SELF-CHECK:
 
         # Distribute acceptance criteria IDs across stories (P0 → story-1, rest → later stories)
         if ac_ids and architecture_note.stories:
-            p0_ids = [aid for aid in ac_ids if aid in ac_ids]  # all for now
+            p0_ids = list(ac_ids)
             # Assign P0 to first story, remainder distributed
             chunk_size = max(1, len(p0_ids) // len(architecture_note.stories))
             for idx, story in enumerate(architecture_note.stories):
@@ -261,16 +234,18 @@ Evaluate this solution objectively. Answer:
 4. Risks and blockers (list anything that could delay or prevent completion)
 
 Base your answer on the actual technical requirements, not general assumptions.
-{self._get_principles_checklist()}
+
 Feasibility:"""
 
         response = await self.generate_response_async(prompt)
 
-        # Parse feasibility
-        if "YES" in response.upper():
-            feasibility = "feasible"
-        elif "PARTIAL" in response.upper():
+        # Parse feasibility — PARTIAL checked first, word-boundary YES to avoid substring match
+        import re as _re
+        verdict_region = response[-200:].upper()
+        if _re.search(r'\bPARTIAL', verdict_region):
             feasibility = "partially_feasible"
+        elif _re.search(r'\bYES\b', verdict_region):
+            feasibility = "feasible"
         else:
             feasibility = "not_feasible"
 
@@ -295,8 +270,7 @@ Feasibility:"""
         file_path = task.get("file_path", "unknown")
         context = task.get("context", "")
 
-        prompt = f"""
-As CTO, I need to review this code:
+        prompt = f"""Code review.
 
 File: {file_path}
 Context: {context}
@@ -305,15 +279,7 @@ Context: {context}
 {code}
 ```
 
-Please review for:
-1. Code quality and readability
-2. Best practices and patterns
-3. Potential bugs or issues
-4. Security concerns
-5. Performance considerations
-6. Suggestions for improvement
-
-Provide specific, actionable feedback.
+Flag bugs, security issues, and performance problems. Suggest specific improvements.
 """
 
         response = await self.generate_response_async(prompt)
@@ -333,26 +299,12 @@ Provide specific, actionable feedback.
         use_case = task.get("use_case", "")
         preferences = task.get("preferences", [])
 
-        prompt = f"""
-As CTO, I need to select the right technologies for this project:
+        prompt = f"""Technology selection for: {use_case}
 
-Use Case: {use_case}
+Requirements: {chr(10).join(f'- {r}' for r in requirements)}
+Constraints: {chr(10).join(f'- {p}' for p in preferences) if preferences else 'None'}
 
-Requirements:
-{chr(10).join(f'  - {r}' for r in requirements)}
-
-Preferences/Constraints:
-{chr(10).join(f'  - {p}' for p in preferences) if preferences else 'None specified'}
-
-Please recommend:
-1. Programming language(s)
-2. Frameworks/libraries
-3. Database(s)
-4. Infrastructure/hosting
-5. Development tools
-6. Justification for each choice
-
-Consider: maturity, community support, learning curve, performance, and maintainability.
+Recommend language, framework, database. Justify each choice in one sentence. Prefer proven, low-complexity options.
 """
 
         response = await self.generate_response_async(prompt)
@@ -371,19 +323,12 @@ Consider: maturity, community support, learning curve, performance, and maintain
         question = task.get("question", "")
         context = task.get("context", "")
 
-        prompt = f"""
-As CTO, I need to provide technical guidance:
+        prompt = f"""Technical guidance needed.
 
 Question: {question}
-
 Context: {context}
 
-Please provide:
-1. Clear technical explanation
-2. Best practices to follow
-3. Common pitfalls to avoid
-4. Specific recommendations
-5. Resources for further learning (if applicable)
+Explain the concept, best practices, and common pitfalls. Be specific and concise.
 """
 
         response = await self.generate_response_async(prompt)
@@ -398,7 +343,7 @@ Please provide:
         description = task.get("description", "")
 
         response = await self.generate_response_async(
-            f"As CTO, please address: {description}"
+            f"CTO task: {description}"
         )
 
         return TaskResult(
@@ -412,33 +357,21 @@ Please provide:
 
     def create_technical_spec(self, feature_description: str) -> str:
         """Create a technical specification for a feature."""
-        prompt = f"""
-Create a technical specification for this feature:
+        prompt = f"""Write a technical specification for this feature:
 
 {feature_description}
 
-Include:
-1. Technical requirements
-2. Implementation approach
-3. API design (if applicable)
-4. Data models
-5. Testing strategy
-6. Deployment considerations
+Cover: requirements, implementation approach, API design (if any), data models, and testing strategy.
 """
         return self.generate_response(prompt)
 
     def estimate_complexity(self, task_description: str) -> Dict[str, Any]:
         """Estimate the complexity of a technical task."""
-        prompt = f"""
-Estimate the complexity of this task:
+        prompt = f"""Estimate complexity of this task:
 
 {task_description}
 
-Provide:
-1. Complexity level: Low/Medium/High/Very High
-2. Key complexity factors
-3. Risk areas
-4. Dependencies
+State: Complexity level (Low/Medium/High/Very High), key factors, risks, and dependencies.
 """
         response = self.generate_response(prompt)
 
@@ -458,16 +391,11 @@ Provide:
 
     def review_architecture_decision(self, decision: str, context: str) -> str:
         """Review an architectural decision."""
-        prompt = f"""
-Review this architectural decision:
+        prompt = f"""Review this architectural decision.
 
 Decision: {decision}
 Context: {context}
 
-Evaluate:
-1. Is this a good decision? Why/why not?
-2. What are the implications?
-3. Are there better alternatives?
-4. What should we watch out for?
+Is this sound? State implications, better alternatives if any, and key risks to watch.
 """
         return self.generate_response(prompt, use_first_principles=True)

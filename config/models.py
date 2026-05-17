@@ -206,11 +206,15 @@ class ModelConfig:
             )
 
     def list_required_models(self) -> list[str]:
-        """List unique Ollama model tags required."""
-        return sorted({spec.ollama_model for spec in self.configs.values()})
+        """List unique model IDs required for the active backend."""
+        from config.llm_client import _get_backend
+        backend = _get_backend()
+        return sorted({spec.model_id(backend) for spec in self.configs.values()})
 
     def print_config(self) -> None:
+        from config.llm_client import _get_backend
+        backend = _get_backend()
         console.section("Model Configuration")
         for role, spec in self.configs.items():
-            console.info(f"  {role.value:20} -> {spec.ollama_model}")
+            console.info(f"  {role.value:20} -> {spec.model_id(backend)}")
         console.info(f"Required models: {', '.join(self.list_required_models())}")

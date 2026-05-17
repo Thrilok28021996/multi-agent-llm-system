@@ -203,21 +203,21 @@ Company AGI follows a complete software company workflow:
 The parser recognizes these file markers:
 
 ```
-**File Path:** `backend/src/main.py`
+**File Path:** `path/to/file.py`
 ```python
 # code here
 ```
 ```
 
 ```
-=== FILE: frontend/App.js ===
+=== FILE: app.js ===
 ```javascript
 // code here
 ```
 ```
 
 ```
-#### File: tests/test_api.py
+#### File: test_main.py
 ```python
 # code here
 ```

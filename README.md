@@ -271,12 +271,12 @@ autonomous-company-orchestrator/
 │   └── roles.py · validation.py
 │
 ├── tools/                   # Agent tool integrations (git, LSP, test runner)
-├── utils/                   # Health checker, cost tracker, output validator
+├── utils/                   # Health checker, usage tracker, output validator
 ├── ui/                      # Rich terminal interface + streaming
 ├── docs/assets/             # Org chart · execution flow · terminal screenshots
 ├── tests/
 ├── .env.example             # Full backend + model configuration template
-├── main.py
+├── main.py                  # CLI entry point
 └── requirements.txt
 ```
 

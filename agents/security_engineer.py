@@ -5,50 +5,40 @@ from typing import Any, Dict, List, Optional
 from .base_agent import BaseAgent, AgentConfig, AgentRole, TaskResult
 from .agent_tools_mixin import AgentToolsMixin
 from research.problem_statement_refiner import ProblemStatementRefiner
+from tools import UnifiedTools
 from ui.console import console
 
 
-SECURITY_SYSTEM_PROMPT = """You are the Security Engineer. You review code for security vulnerabilities, check for hardcoded secrets, validate input sanitization, and assess the threat model. You are thorough but practical - flag real security risks, not theoretical ones.
+SECURITY_SYSTEM_PROMPT = """You are the Security Engineer. You find real, exploitable security issues — not theoretical ones.
 
-Your priorities (in order):
-1. Find hardcoded secrets - API keys, passwords, tokens in source code are ALWAYS critical.
-2. Identify injection vulnerabilities - SQL injection, XSS, command injection, path traversal.
-3. Validate input sanitization - all user input must be validated before use.
-4. Check authentication and authorization - are access controls implemented correctly?
-5. Assess the overall threat model - what is the attack surface and how is it protected?
+Priorities (in order):
+1. Hardcoded secrets — API keys, passwords, tokens in source code are ALWAYS critical. Ignore placeholder values like 'your-key-here'.
+2. Injection vulnerabilities — SQL injection, command injection, path traversal, XSS.
+3. Input sanitization — every user-controlled input must be validated before reaching files, SQL, shell, or eval.
+4. Auth and authorization — are access controls present on everything that needs them?
+5. Supply chain — for each dependency: last update >1 year = flag, known CVEs = flag.
 
-Your verdict system:
-- SECURE: No significant security issues found. Code follows security best practices.
-- HAS_ISSUES: Security issues found that should be fixed but are not immediately exploitable.
-- CRITICAL_VULNERABILITIES: Exploitable vulnerabilities found. Must be fixed before deployment.
+Verdict system:
+- SECURE: No significant issues. Code follows security best practices.
+- HAS_ISSUES: Issues exist but are not immediately exploitable. Should be fixed.
+- CRITICAL_VULNERABILITIES: Exploitable vulnerabilities found. Must fix before deployment.
 
-Judgment guidelines:
-- Hardcoded real secrets (API keys, passwords with actual values) are CRITICAL. Placeholder values in .env.example are MEDIUM.
-- SQL injection, command injection, and path traversal are ALWAYS critical.
-- Missing CSRF protection in a form is HIGH, not CRITICAL, unless it guards sensitive actions.
-- Missing rate limiting is MEDIUM for most endpoints, HIGH for auth endpoints.
-- Focus on what an attacker could actually exploit, not on theoretical attack vectors.
-- When flagging issues, include the specific vulnerable code and a concrete fix.
+Severity calibration:
+- CRITICAL: Hardcoded real secret, SQL/command/path injection, crash that leaks data.
+- HIGH: Missing auth on sensitive action, path traversal in web server.
+- MEDIUM: Missing rate limiting on auth, placeholder secrets in committed files.
+- LOCAL-FIRST context: Network-exposed surfaces are HIGH priority. Local-only file access is LOWER priority.
 
-Local-First Threat Model: This is a personal tool running locally. Network-exposed attack surfaces are HIGH priority. Local-only file access is LOWER priority. Calibrate severity to the actual deployment context.
-
-Dependency Supply Chain: Check every dependency for: last update date (>1 year = flag), download count (<1000/month = flag), known CVEs.
-
-OWASP Mapping: Map every finding to an OWASP Top 10 category.
-
-Supply Chain Check: For every dependency, check: last update date, known CVEs, maintainer count. Flag any with concerning metrics.
-
-Least Privilege: Verify the solution requests minimum permissions. Flag any over-broad access patterns.
-
-Defense in Depth: Security should not depend on a single control. For critical data paths, verify: input validation AND output encoding AND error messages that don't leak internals. One control failing should not mean total compromise.
+For each finding: include the specific vulnerable code line, OWASP Top 10 category, and a concrete fix.
+Defense in depth: for critical data paths, verify input validation AND output encoding AND error messages that don't leak internals.
 """
 
 SECURITY_FIRST_PRINCIPLES = [
-    "ATTACKER MINDSET: Think like an attacker, not a checklist runner. Ask: If I wanted to break this, what would I try? Then verify those attack vectors.",
-    "SEARCH for hardcoded strings: API keys, passwords, tokens. IGNORE placeholders like 'your-key-here'. Real secrets have high entropy.",
-    "INPUT TRACING: For every user-controllable input, trace it through the code. Does it reach file paths, SQL, shell, or eval without sanitization?",
-    "PRACTICAL SEVERITY: Rate vulnerabilities by exploitability, not theoretical severity. A SQL injection in a CLI tool with no network exposure is lower risk than path traversal in a web server.",
-    "VERIFY: Is auth on every endpoint that needs it? List unprotected endpoints. Check for privilege escalation paths.",
+    "ATTACKER MINDSET: What would I try if I wanted to break this? List the top 3 attack vectors, then verify each one.",
+    "SECRET SCAN: Search for hardcoded strings with high entropy. Ignore placeholders — flag actual values.",
+    "INPUT TRACE: For every user-controllable input, trace it to its sink. Does it reach file paths, SQL, shell, or eval without sanitization?",
+    "PRACTICAL SEVERITY: Rate by exploitability in the actual deployment context, not theoretical worst-case. A CLI tool with no network exposure is not the same as a web server.",
+    "AUTH COVERAGE: List every endpoint or action that requires auth. Is auth present on all of them? Check for privilege escalation paths.",
 ]
 
 
@@ -77,6 +67,9 @@ class SecurityEngineerAgent(BaseAgent, AgentToolsMixin):
             max_tokens=4096
         )
         super().__init__(config, workspace_root, memory_persist_dir)
+
+        self.tools = UnifiedTools(workspace_root=workspace_root, persist_dir=memory_persist_dir)
+        self.enable_react_tools()
 
         # Problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -558,17 +551,17 @@ OVERALL RISK ASSESSMENT:
 
     def _parse_security_verdict(self, response: str) -> str:
         """Parse security verdict from response."""
-        upper = response.upper()
-        if "CRITICAL_VULNERABILITIES" in upper or "CRITICAL" in upper:
+        import re
+        # Scan only the verdict region (last 300 chars) to avoid matching severity labels in body
+        verdict_region = response[-300:].upper()
+        if re.search(r'\bCRITICAL_VULNERABILITIES\b', verdict_region):
             return "critical_vulnerabilities"
-        elif "HAS_ISSUES" in upper:
+        if re.search(r'\bHAS_ISSUES\b', verdict_region) or re.search(r'\bNEEDS_REVIEW\b', verdict_region):
             return "has_issues"
-        elif "SECURE" in upper:
+        if re.search(r'\bSECURE\b', verdict_region) and not re.search(r'\bINSECURE\b', verdict_region):
             return "secure"
-        elif "NEEDS_REVIEW" in upper:
-            return "has_issues"  # Mild issues, not critical
-        else:
-            return "secure"  # No explicit issues mentioned = no issues found
+        # Default: flag for review rather than falsely clear
+        return "has_issues"
 
     def _extract_vulnerabilities(self, response: str) -> List[Dict[str, Any]]:
         """Extract vulnerabilities from review response."""

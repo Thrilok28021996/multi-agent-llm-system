@@ -62,9 +62,9 @@ class OllamaBackend:
                 "num_ctx": n_ctx,
             },
         )
-        text = response["message"]["content"] or ""
-        input_tokens = response.get("prompt_eval_count", 0)
-        output_tokens = response.get("eval_count", 0)
+        text = response.message.content or ""
+        input_tokens = getattr(response, "prompt_eval_count", 0) or 0
+        output_tokens = getattr(response, "eval_count", 0) or 0
         return text, input_tokens, output_tokens
 
     def chat_stream(
@@ -93,13 +93,13 @@ class OllamaBackend:
         input_tokens = 0
         output_tokens = 0
         for chunk in stream:
-            delta = chunk["message"]["content"] or ""
+            delta = chunk.message.content or ""
             if delta:
                 full_response += delta
                 callback(delta)
-            if chunk.get("done"):
-                input_tokens = chunk.get("prompt_eval_count", 0)
-                output_tokens = chunk.get("eval_count", 0)
+            if getattr(chunk, "done", False):
+                input_tokens = getattr(chunk, "prompt_eval_count", 0) or 0
+                output_tokens = getattr(chunk, "eval_count", 0) or 0
         return full_response, input_tokens, output_tokens
 
 

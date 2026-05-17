@@ -56,15 +56,15 @@ class AgentModels:
 
     Defaults match config/models.py MODEL_CONFIGS (optimized for 16GB RAM).
     """
-    ceo: str = "qwen3-8b"
-    cto: str = "qwen3-8b"
-    product_manager: str = "ministral-8b"
-    researcher: str = "ministral-8b"
-    developer: str = "qwen2.5-coder-7b"
-    qa_engineer: str = "qwen2.5-coder-7b"
-    devops_engineer: str = "qwen2.5-coder-7b"
-    data_analyst: str = "qwen3-8b"
-    security_engineer: str = "qwen2.5-coder-7b"
+    ceo: str = "goekdenizguelmez/JOSIEFIED-Qwen3:8b"
+    cto: str = "goekdenizguelmez/JOSIEFIED-Qwen3:8b"
+    product_manager: str = "ministral-3:8b"
+    researcher: str = "ministral-3:8b"
+    developer: str = "thealxlabs/lumen:latest"
+    qa_engineer: str = "thealxlabs/lumen:latest"
+    devops_engineer: str = "thealxlabs/lumen:latest"
+    data_analyst: str = "goekdenizguelmez/JOSIEFIED-Qwen3:8b"
+    security_engineer: str = "thealxlabs/lumen:latest"
 
 
 @dataclass
@@ -277,15 +277,15 @@ class ConfigLoader:
                 "retry_delay": 1.0
             },
             "models": {
-                "ceo": "qwen3-8b",
-                "cto": "qwen3-8b",
-                "product_manager": "ministral-8b",
-                "researcher": "ministral-8b",
-                "developer": "qwen2.5-coder-7b",
-                "qa_engineer": "qwen2.5-coder-7b",
-                "devops_engineer": "qwen2.5-coder-7b",
-                "data_analyst": "qwen3-8b",
-                "security_engineer": "qwen2.5-coder-7b"
+                "ceo": "goekdenizguelmez/JOSIEFIED-Qwen3:8b",
+                "cto": "goekdenizguelmez/JOSIEFIED-Qwen3:8b",
+                "product_manager": "ministral-3:8b",
+                "researcher": "ministral-3:8b",
+                "developer": "thealxlabs/lumen:latest",
+                "qa_engineer": "thealxlabs/lumen:latest",
+                "devops_engineer": "thealxlabs/lumen:latest",
+                "data_analyst": "goekdenizguelmez/JOSIEFIED-Qwen3:8b",
+                "security_engineer": "thealxlabs/lumen:latest"
             },
             "problem": "",
             "domain": "software",

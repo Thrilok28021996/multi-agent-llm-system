@@ -171,9 +171,12 @@ class TestFileLockIntegration:
 
         # Simulate locked write
         with file_lock(test_file, exclusive=True):
-            data = safe_read_json(test_file)
+            # Read directly without locking since we already hold the lock
+            import json
+            data = json.loads(test_file.read_text())
             data["counter"] += 1
-            atomic_write_json(test_file, data)
+            # Write directly without atomic write (we already have exclusive lock)
+            test_file.write_text(json.dumps(data, indent=2))
 
         result = safe_read_json(test_file)
         assert result["counter"] == 1

@@ -79,7 +79,7 @@ def check_models(config: ModelConfig) -> dict:
             import ollama as _ollama
             host = OllamaBackend()._host()
             client = _ollama.Client(host=host)
-            pulled = {m["name"] for m in client.list().get("models", [])}
+            pulled = {m.model for m in client.list().models}
             for model_id, spec in unique_specs.items():
                 found = any(model_id in p for p in pulled)
                 status[model_id] = f"{'found' if found else 'missing'} ({model_id})"
@@ -903,6 +903,9 @@ Generated code: current directory (override with --output-dir or --target)
         config.set_model_for_role("researcher", app_config.models.researcher)
         config.set_model_for_role("developer", app_config.models.developer)
         config.set_model_for_role("qa_engineer", app_config.models.qa_engineer)
+        config.set_model_for_role("devops_engineer", app_config.models.devops_engineer)
+        config.set_model_for_role("data_analyst", app_config.models.data_analyst)
+        config.set_model_for_role("security_engineer", app_config.models.security_engineer)
 
     # CLI backend override
     if args.backend:
@@ -919,12 +922,13 @@ Generated code: current directory (override with --output-dir or --target)
         workspace_root = str(target_dir)
         print(f"Target directory: {workspace_root}")
 
-    # Output dir defaults to workspace_root (CWD)
-    output_dir = args.output_dir or workspace_root
-
-    # Use output dir from config if not specified on CLI
-    if args.output_dir is None and app_config.output.solutions_dir != "output/solutions":
+    # Output dir: CLI flag > config > safe default under output/solutions (never project root)
+    if args.output_dir:
+        output_dir = args.output_dir
+    elif app_config.output.solutions_dir != "output/solutions":
         output_dir = app_config.output.solutions_dir
+    else:
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "solutions")
 
     # Validate output dir is writable
     output_path = Path(output_dir)

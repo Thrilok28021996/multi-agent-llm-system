@@ -85,8 +85,9 @@ class CompanyConsole:
         if not text:
             return ""
 
-        # Strip <think>/<​/think> tags but keep the reasoning content visible
-        text = re.sub(r'</?think>', '', text)
+        # Strip Qwen3 native thinking blocks entirely (content + tags)
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)  # unclosed tag
 
         # Remove other common artifacts
         text = re.sub(r'<\/?begin.*?>', '', text, flags=re.IGNORECASE)
@@ -365,11 +366,44 @@ class CompanyConsole:
 
     def create_stream_callback(self, agent_name: str):
         """Create a callback function for streaming output from an agent."""
+        state = {"in_think": False, "buf": ""}
+
         def callback(token: str):
-            # Only show non-thinking tokens
-            if not token.startswith('<think>') and '</think>' not in token:
-                sys.stdout.write(token)
-                sys.stdout.flush()
+            # Accumulate partial tags to detect <think> / </think> boundaries
+            s = state
+            s["buf"] += token
+            # Drain buffer once we have enough chars to detect a complete tag
+            while True:
+                if s["in_think"]:
+                    end = s["buf"].find("</think>")
+                    if end != -1:
+                        s["in_think"] = False
+                        s["buf"] = s["buf"][end + len("</think>"):]
+                    else:
+                        # Still inside thinking — discard all but last 8 chars
+                        # (keep a tail in case </think> is split across tokens)
+                        s["buf"] = s["buf"][-8:] if len(s["buf"]) > 8 else s["buf"]
+                        break
+                else:
+                    start = s["buf"].find("<think>")
+                    if start != -1:
+                        # Print whatever came before <think>
+                        before = s["buf"][:start]
+                        if before:
+                            sys.stdout.write(before)
+                            sys.stdout.flush()
+                        s["in_think"] = True
+                        s["buf"] = s["buf"][start + len("<think>"):]
+                    else:
+                        # No <think> in buffer — safe to print all but last 6 chars
+                        # (keep tail in case <think> is split across tokens)
+                        safe_len = max(0, len(s["buf"]) - 6)
+                        if safe_len:
+                            sys.stdout.write(s["buf"][:safe_len])
+                            sys.stdout.flush()
+                            s["buf"] = s["buf"][safe_len:]
+                        break
+
         return callback
 
     def success(self, message: str) -> None:

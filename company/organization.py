@@ -51,7 +51,7 @@ DEPARTMENT_DEFINITIONS: Dict[str, DepartmentInfo] = {
     ),
     "engineering": DepartmentInfo(
         head="CTO",
-        members=["CTO", "Developer", "DevOps", "SecurityEngineer"],
+        members=["CTO", "Developer", "DevOpsEngineer", "SecurityEngineer"],
         responsibilities=["Architecture", "Implementation", "Deployment", "Security"],
         decision_authority="technical"
     ),

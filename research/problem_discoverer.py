@@ -427,24 +427,54 @@ LANGUAGE: [language code]
 
 Find 1-5 distinct problems. Focus on real, actionable problems that could be solved with software or automation. Skip vague complaints or problems without clear solutions."""
 
-        try:
-            from config.llm_client import get_llm_client
-            from config.models import ModelConfig
-            from config.roles import AgentRole
-            model_spec = ModelConfig().get_model(AgentRole.RESEARCHER)
-            response_text, _, _ = await get_llm_client().chat_async(
-                model_spec,
-                [{"role": "user", "content": prompt}],
-                temperature=0.4,
-                max_tokens=2048,
-            )
+        from config.llm_client import get_llm_client
+        from config.models import ModelConfig
+        from config.roles import AgentRole
+        model_spec = ModelConfig().get_model(AgentRole.RESEARCHER)
+        client = get_llm_client()
+        messages = [{"role": "user", "content": prompt}]
 
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                response_text, _, _ = await client.chat_async(
+                    model_spec, messages, temperature=0.4, max_tokens=2048,
+                )
+                break
+            except (ConnectionError, OSError) as e:
+                if attempt < max_attempts - 1:
+                    delay = 2 ** attempt  # 1s, 2s
+                    logger.warning(
+                        "LLM connection error for %s (attempt %d/%d), retrying in %ds: %s",
+                        source, attempt + 1, max_attempts, delay, e,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.warning(
+                        "LLM analysis failed for %s after %d attempts — "
+                        "is LM Studio running at localhost:1234? Error: %s",
+                        source, max_attempts, e,
+                    )
+                    return []
+            except Exception as e:
+                logger.warning("LLM analysis failed for %s: %s", source, e)
+                return []
+
+        try:
             problems = self._parse_problems_response(response_text, source, domain)
+
+            # DIAGNOSTIC: log content size and LLM response to identify failure mode
+            logger.warning(
+                "[DIAG] source=%s content_len=%d llm_response_len=%d problems_found=%d "
+                "llm_preview=%r",
+                source, len(content), len(response_text), len(problems),
+                response_text[:300]
+            )
 
             return problems
 
         except Exception as e:
-            logger.warning(f"LLM analysis failed for {source}: {e}")
+            logger.warning("Problem parsing failed for %s: %s", source, e)
             return []
 
     def _parse_problems_response(
@@ -472,7 +502,7 @@ Find 1-5 distinct problems. Focus on real, actionable problems that could be sol
                 problem_blocks = re.split(r'\n(?=#{1,3}\s*\*{0,2}\d+[\.\)]\s)', response)
             if len(problem_blocks) <= 1:
                 # Fallback: split by numbered lines (1. Something, 2) Something)
-                problem_blocks = re.split(r'\n(?=\d+[\.\)]\s+\*{0,2}[A-Z])', response)
+                problem_blocks = re.split(r'\n(?=\d+[\.\)]\s+\*{0,2}[A-Za-z])', response)
             if len(problem_blocks) <= 1:
                 # Last resort: treat entire response as one problem block
                 problem_blocks = [response]
@@ -602,6 +632,17 @@ Find 1-5 distinct problems. Focus on real, actionable problems that could be sol
                 if val:
                     accumulator.append(val)
                 continue
+
+            # Plain numbered item (e.g. "1. Users struggle with...") → treat as description
+            if not fields.get("description") and not current_field:
+                m_num = re.match(r'^\d+[\.\)]\s+(.*)', normalized)
+                if m_num:
+                    _flush()
+                    current_field = "description"
+                    val = m_num.group(1).strip()
+                    if val:
+                        accumulator.append(val)
+                    continue
 
             # Check standard field prefixes
             matched = False

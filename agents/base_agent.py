@@ -836,6 +836,14 @@ COGNITIVE DISCIPLINE:
                     )
             if answer_block:
                 result = answer_block
+            else:
+                # Model partially followed CoT — strip ALL residual thinking/tag artifacts
+                result = re.sub(r'<think>.*?</think>', '', result, flags=re.DOTALL)
+                result = re.sub(r'<think>.*', '', result, flags=re.DOTALL)
+                result = re.sub(r'</?think[^>]*>', '', result)
+                result = re.sub(r'</?thinking>', '', result)
+                result = re.sub(r'</?answer>', '', result)
+                result = re.sub(r'\n{3,}', '\n\n', result).strip()
 
         # Verify first principles compliance (lightweight, no LLM call).
         # We only trigger an actual LLM retry when the response shows NO reasoning
@@ -1073,8 +1081,9 @@ COGNITIVE DISCIPLINE:
         if not text:
             return ""
 
-        # Strip <think>/<​/think> tags but keep the reasoning content visible
-        text = re.sub(r'</?think>', '', text)
+        # Strip Qwen3 native thinking blocks entirely (content + tags)
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)  # unclosed tag
 
         # Remove other common artifacts
         text = re.sub(r'<\/?begin.*?>', '', text, flags=re.IGNORECASE)
@@ -1303,7 +1312,7 @@ My reflection:
 
     def get_model_status(self) -> Dict[str, Any]:
         """Get model status information."""
-        backend = get_llm_client()._resolve()
+        backend = get_llm_client()._backend
         return {
             "model": self.model,
             "backend": backend,
@@ -1374,27 +1383,39 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
     # ============================================================
 
     def _parse_cot_response(self, raw: str) -> tuple:
-        """Parse <thinking>...</thinking> and <answer>...</answer> blocks.
+        """Parse thinking/answer blocks from LLM output.
+
+        Handles two formats:
+        - Qwen3 native:   <think>...</think>  (answer is whatever follows)
+        - Injected CoT:   <thinking>...</thinking><answer>...</answer>
 
         Returns:
-            (thinking, answer) tuple. If tags not found returns ("", raw).
-            Handles malformed output where </thinking> is missing by stopping at <answer>.
+            (thinking, answer) — if no thinking found returns ("", raw).
         """
-        # Try strict match first
+        # Format 1: Qwen3 native <think>...</think>
+        think_match = re.search(r'<think>(.*?)</think>', raw, re.DOTALL)
+        if think_match:
+            thinking = think_match.group(1).strip()
+            answer = raw[think_match.end():].strip()
+            return thinking, answer or raw[:think_match.start()].strip()
+
+        # Format 1b: unclosed <think> tag (model still generating / truncated)
+        unclosed = re.search(r'<think>(.*?)$', raw, re.DOTALL)
+        if unclosed:
+            thinking = unclosed.group(1).strip()
+            answer = raw[:unclosed.start()].strip()
+            return thinking, answer if answer else ""
+
+        # Format 2: injected <thinking>/<answer> tags (strict)
         thinking_match = re.search(r'<thinking>(.*?)</thinking>', raw, re.DOTALL)
         answer_match = re.search(r'<answer>(.*?)</answer>', raw, re.DOTALL)
-
         if thinking_match and answer_match:
-            thinking = thinking_match.group(1).strip()
-            answer = answer_match.group(1).strip()
-            return thinking, answer
+            return thinking_match.group(1).strip(), answer_match.group(1).strip()
 
-        # Malformed: <thinking> present but no </thinking> — extract up to <answer> tag
+        # Format 2b: <thinking> present but no </thinking> — extract up to <answer>
         open_thinking = re.search(r'<thinking>(.*?)(?=<answer>|$)', raw, re.DOTALL)
         if open_thinking and answer_match:
-            thinking = open_thinking.group(1).strip()
-            answer = answer_match.group(1).strip()
-            return thinking, answer
+            return open_thinking.group(1).strip(), answer_match.group(1).strip()
 
         return "", raw
 
@@ -1439,6 +1460,8 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
 
         Checks for keywords like approve/reject/yes/no/proceed/halt/pass/fail.
         Returns the first matched keyword in lowercase, or "" if none found.
+        Uses word-boundary matching to avoid substring false positives
+        (e.g., "no" matching "not", "pass" matching "password").
         """
         default_keywords = [
             "approve", "reject", "yes", "no", "proceed", "halt", "pass", "fail"
@@ -1446,7 +1469,7 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
         check_keywords = keywords if keywords else default_keywords
         response_lower = response.lower()
         for kw in check_keywords:
-            if kw in response_lower:
+            if re.search(r'\b' + re.escape(kw) + r'\b', response_lower):
                 return kw
         return ""
 
@@ -1474,6 +1497,12 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
             return self.generate_response(prompt)
 
         original_temp = self.config.temperature
+        # Suppress streaming during sampling — intermediate responses must not print to stdout
+        orig_streaming = self._streaming_enabled
+        orig_callback = self._stream_callback
+        self._streaming_enabled = False
+        self._stream_callback = None
+
         responses = []
 
         # Generate n responses with slightly varied temperatures
@@ -1489,7 +1518,10 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
                 responses.append(resp)
             except Exception as e:
                 console.warning(f"[Consistency] Sample {i+1} failed: {e}")
+
         self.config.temperature = original_temp
+        self._streaming_enabled = orig_streaming
+        self._stream_callback = orig_callback
 
         if not responses:
             return ""
@@ -1547,37 +1579,46 @@ Messages Pending: {status['inbox_count']} in, {status['outbox_count']} out
         Returns:
             The final refined response string
         """
-        # Pass 1: initial draft
-        current_response = self.generate_response(prompt)
+        # Suppress streaming for all refinement passes — no partial output should print
+        orig_streaming = self._streaming_enabled
+        orig_callback = self._stream_callback
+        self._streaming_enabled = False
+        self._stream_callback = None
 
-        focus_clause = f" Focus especially on: {critique_focus}." if critique_focus else ""
+        try:
+            # Pass 1: initial draft
+            current_response = self.generate_response(prompt)
 
-        for pass_num in range(2, passes + 1):
-            critique_prompt = (
-                f"You are reviewing your own previous response to this task:\n\n"
-                f"ORIGINAL TASK:\n{prompt}\n\n"
-                f"YOUR PREVIOUS RESPONSE:\n{current_response}\n\n"
-                f"Identify exactly 3 specific weaknesses or gaps in the previous response.{focus_clause}\n"
-                f"Then provide an improved version that fixes those weaknesses.\n\n"
-                f"Format your response as:\n"
-                f"WEAKNESSES:\n1. ...\n2. ...\n3. ...\n\n"
-                f"REFINED_RESPONSE:\n[your improved response here]"
-            )
+            focus_clause = f" Focus especially on: {critique_focus}." if critique_focus else ""
 
-            critique_output = self.generate_response(critique_prompt, use_first_principles=False)
-
-            # Extract REFINED_RESPONSE section
-            refined_match = re.search(
-                r'REFINED_RESPONSE:\s*(.*)', critique_output, re.DOTALL | re.IGNORECASE
-            )
-            if refined_match:
-                current_response = refined_match.group(1).strip()
-            else:
-                # No structured output — keep previous response
-                console.warning(
-                    f"[Refinement] Pass {pass_num} did not produce a REFINED_RESPONSE section; "
-                    "keeping previous response."
+            for pass_num in range(2, passes + 1):
+                critique_prompt = (
+                    f"You are reviewing your own previous response to this task:\n\n"
+                    f"ORIGINAL TASK:\n{prompt}\n\n"
+                    f"YOUR PREVIOUS RESPONSE:\n{current_response}\n\n"
+                    f"Identify exactly 3 specific weaknesses or gaps in the previous response.{focus_clause}\n"
+                    f"Then provide an improved version that fixes those weaknesses.\n\n"
+                    f"Format your response as:\n"
+                    f"WEAKNESSES:\n1. ...\n2. ...\n3. ...\n\n"
+                    f"REFINED_RESPONSE:\n[your improved response here]"
                 )
+
+                critique_output = self.generate_response(critique_prompt, use_first_principles=False)
+
+                # Extract REFINED_RESPONSE section
+                refined_match = re.search(
+                    r'REFINED_RESPONSE:\s*(.*)', critique_output, re.DOTALL | re.IGNORECASE
+                )
+                if refined_match:
+                    current_response = refined_match.group(1).strip()
+                else:
+                    console.warning(
+                        f"[Refinement] Pass {pass_num} did not produce a REFINED_RESPONSE section; "
+                        "keeping previous response."
+                    )
+        finally:
+            self._streaming_enabled = orig_streaming
+            self._stream_callback = orig_callback
 
         return current_response
 

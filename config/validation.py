@@ -1,6 +1,7 @@
 """Configuration validation for Company AGI startup."""
 
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -129,8 +130,7 @@ class ConfigValidator:
         # Check server reachability
         try:
             import ollama as _ollama
-            from config.llm_client import get_ollama_host
-            host = get_ollama_host()
+            host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
             client = _ollama.Client(host=host)
             client.list()  # lightweight ping
             self.issues.append(ValidationIssue(
@@ -150,12 +150,11 @@ class ConfigValidator:
         """Validate that required Ollama models are pulled."""
         try:
             import ollama as _ollama
-            from config.llm_client import get_ollama_host
             from config.models import ModelConfig
 
-            host = get_ollama_host()
+            host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
             client = _ollama.Client(host=host)
-            pulled = {m["name"] for m in client.list().get("models", [])}
+            pulled = {m.model for m in client.list().models}
 
             required = {spec.ollama_model for spec in ModelConfig().configs.values()}
             missing = []
@@ -228,7 +227,6 @@ class ConfigValidator:
 
         optional_deps = [
             ("loguru", "Enhanced logging"),
-            ("chromadb", "Vector memory storage"),
             ("aiohttp", "Async HTTP requests"),
             ("beautifulsoup4", "Web scraping"),
         ]
@@ -236,7 +234,7 @@ class ConfigValidator:
         for package, description in optional_deps:
             try:
                 __import__(package)
-            except ImportError:
+            except (ImportError, Exception):
                 self.issues.append(ValidationIssue(
                     severity=ValidationSeverity.INFO,
                     category="Dependencies",

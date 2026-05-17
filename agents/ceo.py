@@ -8,55 +8,40 @@ from research.problem_statement_refiner import ProblemStatementRefiner
 from tools import UnifiedTools
 
 
-CEO_SYSTEM_PROMPT = """You are the CEO of an autonomous AI company. You make the final call on what ships.
+CEO_SYSTEM_PROMPT = """You are the CEO of an autonomous AI company. You have two distinct jobs depending on context:
 
-Strategic Evaluation Framework (MTRR):
-- Market fit: Does this solve a validated problem that real users have?
-- Technical soundness: Is the implementation correct and well-structured?
-- Resource efficiency: Was this built with appropriate effort and complexity?
-- Risk assessment: What could go wrong in production?
+--- JOB 1: OPPORTUNITY EVALUATION (deciding whether to build something) ---
+Posture: Entrepreneurial. Lean toward YES. Problems are real unless clearly impossible.
+- If a user provided the problem directly: it is APPROVED scope. Evaluate technical feasibility only.
+- If discovered by research: evaluate whether it is plausible and worth building. A reasonable problem with thin evidence is still worth a prototype.
+- Say YES unless the problem is technically impossible, illegal, or so vague no solution could be scoped.
+- Do NOT demand perfect market research before approving. Discovery happens by building.
 
-Decision Quality Checklist:
-- Does this solve a validated problem? Is the evidence from execution, not assumption?
-- Would a paying user choose this over alternatives?
-- If you approve everything, you are not doing your job. Expect to reject 30-40% of first submissions.
-- A good rejection is more valuable than a lazy approval. Your rejection should be a roadmap to success.
-- Think like you are presenting this to a board of directors. What questions would they ask?
-
-Decision framework:
-- APPROVE only when evidence shows the solution works and addresses the stated problem.
-- REJECT when evidence shows the solution is broken, wrong, or misses requirements.
-- REQUEST_MORE_INFO when you lack sufficient evidence to decide either way.
-
-Do NOT reject for style, missing nice-to-haves, or theoretical issues. Only reject for demonstrated failures.
-When rejecting, give the developer a numbered fix list they can act on immediately.
-When requesting more info, you MUST specify exactly what evidence you need.
-
-Investment Thinking: Every approval is an investment of compute, time, and opportunity cost. Ask: "If I had 3 problems to choose from, would I still pick this one?"
-
-Rejection as Mentorship: When you reject, your feedback should be so clear that the Developer could fix it without asking a single question. A vague rejection is worse than a bad approval.
-
-Escalation Trigger: After round 4+ of rejection, do NOT repeat the same feedback. Instead, identify the systemic failure: is this a design problem (requires CTO redesign), a scope problem (requires PM rescoping), or a capability problem (requires different approach)? Drive the team forward — do not be a permanent blocker.
-
+--- JOB 2: SOLUTION APPROVAL (deciding whether the implementation ships) ---
+Posture: Rigorous gatekeeper. Evidence-driven. Only approve what demonstrably works.
 Approval Criteria (ALL must be true):
-1. The solution demonstrably runs (execution evidence, not just code review)
-2. It solves the stated problem (not a related problem, not a superset)
-3. A user could install and use it within 5 minutes following the README
-4. No critical security issues flagged by Security Engineer
+1. The solution runs — execution evidence, not just code review.
+2. It solves the stated problem — not a superset, not a related problem.
+3. A user could install and use it within 5 minutes following the README.
+4. No critical security issues flagged by Security Engineer.
 
-Do NOT approve based on effort or number of iterations. Approve based on evidence.
+Decision framework for solution approval:
+- APPROVE: evidence shows it works and solves the stated problem.
+- REJECT: evidence shows it is broken, wrong, or misses core requirements.
+- REQUEST_MORE_INFO: you need specific missing evidence to decide.
 
-Focus on clear acceptance criteria and success metrics. Keep responses concise and actionable. This is a first-draft scaffolding task — prioritize working structure over perfection.
+When rejecting a solution, give the developer a numbered fix list they can act on immediately.
+After round 4+ of rejection on a solution, identify the systemic failure (design / scope / capability) rather than repeating the same feedback.
+
+Keep responses concise and actionable.
 """
 
 CEO_FIRST_PRINCIPLES = [
-    "EVIDENCE AUDIT: List every piece of concrete evidence (test results, execution output, files created). If evidence is thin, REQUEST_MORE_INFO — do not guess.",
-    "PROBLEM-SOLUTION FIT: Restate the original problem. Does this solution address the ROOT CAUSE or just symptoms? Surface-level fixes = REJECT.",
-    "USER PERSPECTIVE: Would a real user prefer this over doing nothing or using an existing tool? If not clearly better, REJECT.",
-    "RISK ASSESSMENT: What could go wrong in production? If unaddressed critical risks exist, REJECT with specific mitigations needed.",
-    "DECISION INTEGRITY: Am I approving because the evidence is strong, or because I am tired of iterations? Fatigue-based approval = REJECT and escalate.",
-    "OPPORTUNITY COST: What else could the team build instead? If this problem is not in the top 3 by impact, challenge whether we should continue.",
-    "ITERATION FATIGUE GUARD: If this is round 5+ of approval, am I lowering my bar? Check: would I approve this if it were round 1?",
+    "EVIDENCE AUDIT (solutions only): List concrete evidence (test results, execution output, files created). If evidence is thin for a solution, REQUEST_MORE_INFO.",
+    "PROBLEM-SOLUTION FIT: Does this solution address the ROOT CAUSE or just symptoms? For opportunities, is the problem plausible and worth prototyping?",
+    "USER PERSPECTIVE: Would a real user benefit from this? For opportunities, 'yes if built well' is sufficient to approve.",
+    "RISK ASSESSMENT: What could go wrong? For solutions, unaddressed critical risks = REJECT. For opportunities, note risks but do not block.",
+    "DECISION INTEGRITY: Am I requesting more info because I genuinely need it, or to avoid deciding? Blocking without cause wastes the team's time.",
 ]
 
 
@@ -89,6 +74,7 @@ class CEOAgent(BaseAgent, AgentToolsMixin):
             workspace_root=workspace_root,
             persist_dir=memory_persist_dir
         )
+        self.enable_react_tools()
 
         # Initialize problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -135,6 +121,7 @@ class CEOAgent(BaseAgent, AgentToolsMixin):
         """Evaluate a business opportunity."""
         problem = task.get("problem", {})
         market_analysis = task.get("market_analysis", "")
+        user_provided = task.get("user_provided_requirement", False)
 
         bias_flags = task.get("bias_flags", "")
         counter_ev = task.get("counter_evidence", "")
@@ -142,9 +129,33 @@ class CEOAgent(BaseAgent, AgentToolsMixin):
         freshness = task.get("freshness_score", "")
         credibility = task.get("credibility", "")
 
-        research_quality = ""
-        if any([bias_flags, counter_ev, opposing]):
-            research_quality = f"""
+        if user_provided:
+            prompt = f"""A user has directly requested we build a solution for this problem. This is a direct instruction, not a research hypothesis.
+
+Problem: {problem.get('description', 'No description')}
+Target Users: {problem.get('target_users', 'Unknown')}
+
+Market Context:
+{market_analysis}
+
+Meeting Outcome: {task.get('meeting_outcome', 'No meeting data')}
+
+Your job: Evaluate TECHNICAL FEASIBILITY only. Do NOT question market validity or demand more evidence — the problem is already approved by the user.
+
+Answer briefly:
+1. Is this technically feasible to build? (1-2 sentences)
+2. Can we build a useful solution with our capabilities? (1 sentence)
+3. What's the main technical risk? (1 sentence)
+
+Say YES unless the problem is technically impossible or dangerously scoped. Do not ask for more research.
+You MUST respond with a JSON block:
+```json
+{{"decision": "YES"|"NEED_MORE_INFO", "confidence": 0.0-1.0, "reasoning": "..."}}
+```"""
+        else:
+            research_quality = ""
+            if any([bias_flags, counter_ev, opposing]):
+                research_quality = f"""
 --- RESEARCH QUALITY FLAGS (read before deciding) ---
 Bias in data: {bias_flags or 'None'}
 Counter-evidence (reasons this is NOT a real problem): {counter_ev or 'None'}
@@ -153,7 +164,7 @@ Data freshness score: {freshness or 'Unknown'} (1.0=very recent, 0.0=stale)
 Credibility: {credibility or 'Not scored'}
 """
 
-        prompt = f"""Evaluate this opportunity and decide whether to pursue it.
+            prompt = f"""Evaluate this opportunity and decide whether to pursue it.
 
 Problem: {problem.get('description', 'No description')}
 Severity: {problem.get('severity', 'Unknown')}
@@ -173,7 +184,7 @@ Answer these questions briefly:
 Decide based on evidence, not optimism. If bias is high and counter-evidence is strong, lean toward NEED_MORE_INFO.
 You MUST respond with a JSON block:
 ```json
-{{"decision": "YES" or "NO" or "NEED_MORE_INFO", "confidence": 0.0-1.0, "reasoning": "..."}}
+{{"decision": "YES"|"NO"|"NEED_MORE_INFO", "confidence": 0.0-1.0, "reasoning": "..."}}
 ```"""
 
         compute = self._get_compute_config(prompt)
@@ -259,16 +270,9 @@ Example response:
 {{"decision": "APPROVE", "confidence": 0.85, "reasoning": "Code exists, runs, solves the problem, no critical bugs.", "issues": []}}
 ```
 
-BOARD SUMMARY: Before deciding, write a 2-sentence board summary: What problem did we solve? What's the evidence it works?
-
-EVIDENCE CITATION: List 3 specific pieces of EVIDENCE from the test results and execution output that support your decision. If you cannot cite 3 concrete pieces of evidence, respond with REQUEST_MORE_INFO.
-
-RISK REGISTER: List the top 3 risks of shipping this solution. For each risk, state the mitigation.
-
-{self._get_principles_checklist()}
 You MUST respond with a JSON block:
 ```json
-{{"decision": "APPROVE" or "REJECT" or "REQUEST_MORE_INFO", "confidence": 0.0-1.0, "reasoning": "...", "issues": ["issue1"]}}
+{{"decision": "APPROVE"|"REJECT"|"REQUEST_MORE_INFO", "confidence": 0.0-1.0, "reasoning": "...", "issues": ["issue1"]}}
 ```"""
 
         compute = self._get_compute_config(prompt)
@@ -310,23 +314,13 @@ You MUST respond with a JSON block:
         project = task.get("project", {})
         available_agents = task.get("available_agents", [])
 
-        prompt = f"""
-As CEO, I need to allocate resources for this project:
+        prompt = f"""Resource allocation decision.
 
-Project: {project.get('name', 'Unknown')}
-Description: {project.get('description', 'No description')}
+Project: {project.get('name', 'Unknown')} — {project.get('description', 'No description')}
 Priority: {project.get('priority', 'Normal')}
+Available agents: {', '.join(available_agents)}
 
-Available Team Members:
-{', '.join(available_agents)}
-
-Please determine:
-1. Which team members should work on this?
-2. Who should lead the effort?
-3. What's the recommended approach?
-4. Any special considerations?
-
-Provide a clear resource allocation plan.
+Decide who leads, who supports, and the recommended approach. One short paragraph.
 """
 
         response = await self.generate_response_async(prompt)
@@ -348,22 +342,14 @@ Provide a clear resource allocation plan.
 
         options_text = "\n".join(f"  {i+1}. {opt}" for i, opt in enumerate(options))
 
-        prompt = f"""
-As CEO, I need to make a strategic decision:
+        prompt = f"""Strategic decision needed.
 
 Question: {question}
-
-Context:
-{context}
-
+Context: {context}
 Options:
-{options_text if options else "No specific options provided - please recommend the best course of action"}
+{options_text if options else "Open — recommend best course of action"}
 
-Please analyze and decide:
-1. What are the key factors to consider?
-2. What are the pros and cons of each option?
-3. What is your decision and why?
-4. What should be the next steps?
+State your decision and the 2-3 key factors that drove it. Be direct.
 """
 
         response = await self.generate_response_async(prompt)
@@ -383,21 +369,13 @@ Please analyze and decide:
         attendees = task.get("attendees", [])
         context = task.get("context", "")
 
-        prompt = f"""
-As CEO, I'm leading a company meeting.
+        prompt = f"""Run this company meeting and produce concise meeting notes.
 
 Attendees: {', '.join(attendees)}
 Agenda: {agenda}
 Context: {context}
 
-Please:
-1. Open the meeting with context
-2. Address the agenda items
-3. Facilitate discussion points
-4. Summarize decisions and action items
-5. Close with next steps
-
-Provide the meeting notes and outcomes.
+Output: decisions made, action items, and owner for each.
 """
 
         response = await self.generate_response_async(prompt)
@@ -416,13 +394,7 @@ Provide the meeting notes and outcomes.
         """Handle general CEO tasks."""
         description = task.get("description", "")
 
-        prompt = f"""
-As CEO, I need to handle this task:
-
-{description}
-
-Please provide your response with clear reasoning and any decisions or directions.
-"""
+        prompt = f"CEO task: {description}"
 
         response = await self.generate_response_async(prompt)
 
@@ -437,15 +409,14 @@ Please provide your response with clear reasoning and any decisions or direction
 
     def approve_project(self, project_summary: str) -> Dict[str, Any]:
         """Quick approval check for a project."""
-        prompt = f"""
-Quick evaluation needed for this project:
+        prompt = f"""Evaluate this project:
 
 {project_summary}
 
-Should we proceed? Answer with:
+Reply with one of:
 - APPROVED: [reason]
 - REJECTED: [reason]
-- NEEDS_MORE_INFO: [what information is needed]
+- NEEDS_MORE_INFO: [what is needed]
 """
 
         response = self.generate_response(prompt, use_first_principles=True)
@@ -464,14 +435,11 @@ Should we proceed? Answer with:
             for i, item in enumerate(items)
         )
 
-        prompt = f"""
-Please prioritize these items from most to least important:
+        prompt = f"""Prioritize by business value, urgency, resources, and strategic fit:
 
 {items_text}
 
-Consider: business value, urgency, resource requirements, strategic alignment.
-
-Return the prioritized list with brief justification for each ranking.
+Return ranked list with one-sentence justification per item.
 """
 
         response = self.generate_response(prompt)
@@ -484,17 +452,10 @@ Return the prioritized list with brief justification for each ranking.
 
     def make_announcement(self, topic: str, details: str) -> str:
         """Create a company-wide announcement."""
-        prompt = f"""
-Create a company-wide announcement about:
+        prompt = f"""Write a clear, professional company-wide announcement.
 
 Topic: {topic}
 Details: {details}
-
-The announcement should be:
-- Clear and professional
-- Inspiring when appropriate
-- Action-oriented if needed
-- Concise but complete
 """
 
         return self.generate_response(prompt, use_first_principles=False)

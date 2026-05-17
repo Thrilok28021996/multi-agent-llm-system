@@ -11,41 +11,35 @@ from tools import UnifiedTools
 PM_SYSTEM_PROMPT = """You are the Product Manager. You translate problems into clear, buildable requirements.
 
 Your job:
-- Take a problem description and produce a concrete list of requirements the Developer can implement.
-- Define what "done" looks like — clear acceptance criteria.
-- Scope to MVP. Cut anything that is not essential to solving the core problem.
-- Write requirements as specific, testable statements, not vague wishes.
+- Produce 5-7 requirements the Developer can implement and QA can verify. Not fewer, not more.
+- Every requirement must be testable: specific input → expected output → exact command to verify.
+- Scope ruthlessly to MVP. If a feature does not directly serve the core user job, cut it.
 
-Jobs-to-be-Done: What job is the user hiring this solution to do? State it as: When [situation], I want to [motivation], so I can [expected outcome].
+Required output format:
+JOB-TO-BE-DONE: When [situation], I want [motivation], so I can [outcome].
+USER: [who they are, technical level, what frustrates them]
 
-User Persona: Define the primary user: Who are they? What is their technical level? What tools do they currently use? What frustrates them?
+REQUIREMENT [N]: [one specific, testable sentence]
+GIVEN: [precondition]  WHEN: [action]  THEN: [observable outcome]
+VERIFY: [exact command and expected output]
+PRIORITY: P0 | P1 | P2
 
-Scope Ruthlessness: If a feature does not directly serve the primary user's core job, cut it. Every feature has a maintenance cost. MVP means Minimum VIABLE — not minimum features.
+OUT OF SCOPE: [features explicitly not being built]
+FAILURE MODE: [what would make a user abandon this on first use]
 
-Acceptance Criteria Rigor: Every requirement must have: (1) a specific input, (2) an expected output, (3) an exact command to verify. If you cannot write the test, you do not understand the requirement.
+Requirement quality bar:
+- GOOD: "CLI accepts a filename argument and prints word count to stdout."
+- BAD: "The tool should be user-friendly and handle various inputs gracefully." (untestable)
 
-Competitive Awareness: How do existing solutions handle this? What is our specific advantage? If we cannot articulate the advantage in one sentence, we have not found it.
-
-Good requirement: "The CLI tool accepts a filename argument and outputs word count to stdout."
-Bad requirement: "The tool should be user-friendly and handle various inputs gracefully."
-
-Keep requirements to 5-10 items for MVP. Each one should be something a developer can build and QA can verify.
-
-Failure Definition: Define what "failure" looks like for this product. What would make a user abandon it after first use? Design requirements to prevent those failure modes.
-
-Measurable Success: Every requirement must have a measurable success condition. "Works well" is not measurable. "Processes 100 items in under 5 seconds" is measurable.
-
-Rescoping Protocol: When asked to rescope, cut features — never cut quality. A tool that does 1 thing perfectly beats a tool that does 3 things poorly.
-
-Stakeholder Communication: When requirements change, explain the change in plain English: what was cut, why it was cut, and what impact users will notice. The team needs to understand the WHY before they can build the WHAT.
+When rescoping: cut features, never cut quality. One thing done perfectly beats three things done poorly.
 """
 
 PM_FIRST_PRINCIPLES = [
-    "USER STORY: Write ONE user story that captures the core need. If it requires 'and' to describe, you are combining features — split them.",
-    "EXISTING SOLUTIONS: Name 2-3 existing ways users solve this today. What is wrong with each? Our solution must fix those specific shortcomings.",
-    "SCOPE KNIFE: List all features. For each, answer: 'Would the user pay for JUST this feature alone?' If no, it is not MVP.",
-    "TESTABLE DONE: For each requirement, write the exact terminal command and expected output. Untestable = rewrite it.",
-    "ANTI-BLOAT: Count requirements. If >7 for MVP, rank by user impact and cut the bottom 30%.",
+    "USER STORY CHECK: Does the requirement describe one specific thing? If it needs 'and' to describe, split it.",
+    "TESTABILITY GATE: Can you write the exact terminal command and expected output right now? If not, rewrite the requirement until you can.",
+    "SCOPE KNIFE: For each feature, ask: does this directly serve the core job? If no, cut it — every feature has a maintenance cost.",
+    "ANTI-BLOAT: If you have >7 requirements, rank by user impact and cut the lowest until you reach 7.",
+    "FAILURE MODE: What would make the user abandon this after first use? Ensure every P0 requirement prevents that.",
 ]
 
 
@@ -78,6 +72,7 @@ class ProductManagerAgent(BaseAgent, AgentToolsMixin):
             workspace_root=workspace_root,
             persist_dir=memory_persist_dir
         )
+        self.enable_react_tools()
 
         # Initialize problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -125,28 +120,13 @@ class ProductManagerAgent(BaseAgent, AgentToolsMixin):
         problem = task.get("problem", {})
         research_data = task.get("research_data", "")
 
-        prompt = f"""
-As Product Manager, I need to analyze this problem:
+        prompt = f"""Problem analysis.
 
-Problem Description:
-{problem.get('description', 'No description')}
+Problem: {problem.get('description', 'No description')}
+Source: {problem.get('source', 'Unknown')} | Severity: {problem.get('severity', 'Unknown')}
+Research: {research_data}
 
-Source: {problem.get('source', 'Unknown')}
-Severity: {problem.get('severity', 'Unknown')}
-
-Research Data:
-{research_data}
-{self._get_problem_preamble("analyze_problem")}
-Please analyze:
-1. What is the core problem? (Not symptoms, but root cause)
-2. Who experiences this problem? (Target users)
-3. How severe is this problem? (Pain level)
-4. How frequently does it occur?
-5. What are users currently doing to solve it?
-6. Is this a problem worth solving? Why/why not?
-7. What would a good solution look like?
-
-Provide a comprehensive problem analysis.
+State: root cause, target users, pain level, frequency, current workarounds, and whether it is worth solving. 5-7 sentences.
 """
 
         response = await self.generate_response_async(prompt)
@@ -205,8 +185,6 @@ WHEN: user runs `python main.py myfile.txt`
 THEN: stdout shows "Words: 42" and exits with code 0
 MEASURABLE_CRITERIA: python main.py sample.txt | grep "Words:"
 PRIORITY: P0
-
-{self._get_principles_checklist()}
 """
 
         response = await self.generate_response_async(prompt)
@@ -239,23 +217,11 @@ PRIORITY: P0
             for i, f in enumerate(features)
         )
 
-        prompt = f"""
-As Product Manager, I need to prioritize these features:
+        prompt = f"""Prioritize these features using {', '.join(criteria)}.
 
-Features:
 {features_text}
 
-Prioritization Criteria: {', '.join(criteria)}
-
-Please:
-1. Score each feature on each criterion (1-5)
-2. Calculate overall priority
-3. Rank features from highest to lowest priority
-4. Provide rationale for top 3 priorities
-5. Identify any quick wins
-6. Identify any dependencies between features
-
-Use a framework like RICE, MoSCoW, or similar.
+Score each on each criterion (1-5), rank highest to lowest, note quick wins and dependencies.
 """
 
         response = await self.generate_response_async(prompt)
@@ -274,24 +240,15 @@ Use a framework like RICE, MoSCoW, or similar.
         feature = task.get("feature", {})
         personas = task.get("personas", [])
 
-        prompt = f"""
-As Product Manager, I need to create user stories for this feature:
+        prompt = f"""Write 3-7 user stories for this feature.
 
-Feature: {feature.get('name', 'Unknown')}
-Description: {feature.get('description', '')}
+Feature: {feature.get('name', 'Unknown')} — {feature.get('description', '')}
+Personas: {', '.join(personas) if personas else 'General users'}
 
-User Personas: {', '.join(personas) if personas else 'General users'}
-
-Please create user stories in this format:
+Format each as:
 "As a [user type], I want [goal] so that [benefit]"
-
-For each story, include:
-1. User story statement
-2. Acceptance criteria (Given/When/Then)
-3. Priority (High/Medium/Low)
-4. Estimated complexity (S/M/L/XL)
-
-Create 3-7 user stories that cover the feature.
+Acceptance: Given/When/Then
+Priority: High|Medium|Low | Complexity: S|M|L|XL
 """
 
         response = await self.generate_response_async(prompt)
@@ -332,17 +289,19 @@ Please validate:
 3. What requirements are met/not met?
 4. Would users be satisfied with this solution?
 5. What's missing or could be improved?
-6. Overall verdict: PASS / PASS_WITH_NOTES / FAIL
+6. Overall verdict: PASS / PASS_WITH_ISSUES / FAIL
 
-Provide detailed validation feedback.
+Provide concise validation feedback.
 """
 
         response = await self.generate_response_async(prompt)
 
-        # Parse verdict
-        if "PASS_WITH_NOTES" in response.upper():
-            verdict = "pass_with_notes"
-        elif "PASS" in response.upper():
+        # Parse verdict — use word-boundary regex to avoid "NOT PASS" false positive
+        import re
+        verdict_region = response[-200:].upper()
+        if re.search(r'\bPASS_WITH_ISSUES\b', verdict_region):
+            verdict = "pass_with_issues"
+        elif re.search(r'\bPASS\b', verdict_region) and not re.search(r'\bFAIL\b', verdict_region):
             verdict = "pass"
         else:
             verdict = "fail"
@@ -361,7 +320,7 @@ Provide detailed validation feedback.
         description = task.get("description", "")
 
         response = await self.generate_response_async(
-            f"As Product Manager, please address: {description}"
+            f"PM task: {description}"
         )
 
         return TaskResult(
@@ -375,18 +334,11 @@ Provide detailed validation feedback.
 
     def evaluate_opportunity(self, problem_description: str) -> Dict[str, Any]:
         """Quick evaluation of a problem opportunity."""
-        prompt = f"""
-Quick opportunity evaluation:
+        prompt = f"""Evaluate this opportunity. Score 1-10 on severity, market size, solution clarity, and competition.
 
 {problem_description}
 
-Score 1-10 on:
-1. Problem severity (how much pain?)
-2. Market size (how many people affected?)
-3. Solution clarity (do we know how to solve it?)
-4. Competitive landscape (are others solving it?)
-
-Overall recommendation: PURSUE / CONSIDER / PASS
+End with: PURSUE / CONSIDER / PASS
 """
         response = self.generate_response(prompt)
 
@@ -404,17 +356,11 @@ Overall recommendation: PURSUE / CONSIDER / PASS
 
     def create_mvp_scope(self, full_requirements: str) -> str:
         """Define MVP scope from full requirements."""
-        prompt = f"""
-Define the MVP scope from these requirements:
+        prompt = f"""Define MVP scope. Cut everything that isn't essential for one user to get value.
 
 {full_requirements}
 
-Identify:
-1. The absolute minimum features for a usable product
-2. What can be cut or simplified
-3. What's the fastest path to user value
-
-Be ruthless about cutting scope. What's the smallest thing we can ship?
+List: what stays (minimum viable), what gets cut, and the fastest path to ship.
 """
         return self.generate_response(prompt, use_first_principles=True)
 
@@ -422,15 +368,8 @@ Be ruthless about cutting scope. What's the smallest thing we can ship?
         """Write user-facing release notes."""
         changes_text = "\n".join(f"- {c}" for c in changes)
 
-        prompt = f"""
-Write user-facing release notes for these changes:
+        prompt = f"""Write release notes for users. Non-technical, benefit-focused, organized by category.
 
 {changes_text}
-
-Make it:
-- Clear and non-technical
-- Focused on user benefits
-- Well-organized by category
-- Exciting where appropriate
 """
         return self.generate_response(prompt, use_first_principles=False)

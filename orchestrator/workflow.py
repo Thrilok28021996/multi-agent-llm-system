@@ -157,8 +157,8 @@ class CompanyWorkflow:
             {"id": "research", "name": "Research"},
             {"id": "data_analysis", "name": "Data Analysis"},
             {"id": "analysis", "name": "Analysis"},
-            {"id": "opportunity", "name": "Opportunity Eval"},
-            {"id": "design", "name": "Technical Design"},
+            {"id": "opportunity_evaluation", "name": "Opportunity Eval"},
+            {"id": "technical_design", "name": "Technical Design"},
             {"id": "design_review", "name": "Design Review"},
             {"id": "implementation", "name": "Implementation"},
             {"id": "code_execution", "name": "Code Execution"},
@@ -538,7 +538,7 @@ class CompanyWorkflow:
                         if _prev_insights:
                             _prev_note += "Key insights from last run:\n" + "\n".join(f"- {i}" for i in _prev_insights[:3]) + "\n"
                         _prev_note += "Apply these learnings to avoid repeating past mistakes.\n"
-                        for _agent in [self.cto, self.developer, self.pm]:
+                        for _agent in [self.cto, self.developer, self.product_manager]:
                             if _prev_note not in _agent.system_prompt:
                                 _agent.system_prompt += _prev_note
                         console.info(f"Previous session lessons injected ({len(_prev_items)} action items, {len(_prev_insights)} insights)")
@@ -745,12 +745,12 @@ class CompanyWorkflow:
             # Phase 3: Opportunity Evaluation (CEO Decision)
             # Skipped in scaffold_mode — user has already defined the spec
             if scaffold_mode or self.scaffold_mode:
-                self.progress.skip_phase("opportunity")
+                self.progress.skip_phase("opportunity_evaluation")
                 console.info("Scaffold mode: skipping OPPORTUNITY EVALUATION phase (spec is user-provided)")
             elif resumed_phase and resumed_phase.value not in ("idle", "research", "analysis", "opportunity_evaluation"):
-                self.progress.skip_phase("opportunity")
+                self.progress.skip_phase("opportunity_evaluation")
             else:
-                self.progress.start_phase("opportunity")
+                self.progress.start_phase("opportunity_evaluation")
                 console.section("PHASE 3: OPPORTUNITY EVALUATION")
                 console.info("CEO evaluating the opportunity with team meeting...")
                 if not await self._run_opportunity_evaluation():
@@ -805,7 +805,7 @@ class CompanyWorkflow:
                         if not pivoted:
                             self.state.phase = WorkflowPhase.FAILED
                             self.state.error = "Opportunity rejected by CEO (all problems exhausted)"
-                            self.progress.fail_phase("opportunity", "Rejected by CEO after pivot")
+                            self.progress.fail_phase("opportunity_evaluation", "Rejected by CEO after pivot")
                             console.error("All problems rejected by CEO")
                             self.health_checker.stop_background_checks()
                             self.memory_monitor.stop_monitoring()
@@ -831,7 +831,7 @@ class CompanyWorkflow:
                     announcement=f"Approved project: {problem.description}"
                 )
 
-                self.progress.complete_phase("opportunity")
+                self.progress.complete_phase("opportunity_evaluation")
                 self._save_checkpoint()
 
                 if not self._interactive_gate("Opportunity Evaluation", f"Problem: {problem.description}"):
@@ -843,9 +843,9 @@ class CompanyWorkflow:
 
             # Phase 4: Technical Design
             if resumed_phase and resumed_phase.value not in ("idle", "research", "analysis", "opportunity_evaluation", "technical_design"):
-                self.progress.skip_phase("design")
+                self.progress.skip_phase("technical_design")
             else:
-                self.progress.start_phase("design")
+                self.progress.start_phase("technical_design")
                 console.section("PHASE 4: TECHNICAL DESIGN")
                 console.info("CTO designing technical architecture...")
                 design_result = await self.error_recovery.retry_async(
@@ -859,7 +859,7 @@ class CompanyWorkflow:
                 # Quality gate: Tech Design (root cause must be extracted)
                 await self._check_quality_gate("tech_design")
 
-                self.progress.complete_phase("design")
+                self.progress.complete_phase("technical_design")
                 if self._current_sprint_id:
                     try:
                         self.sprint_manager.complete_task(self._current_sprint_id, "design")
@@ -2252,7 +2252,18 @@ class CompanyWorkflow:
         top_score = self.state.artifacts.get("discovered_problems", [{}])[0].get("score", "N/A") if self.state.artifacts.get("discovered_problems") else "N/A"
         freshness = self.state.artifacts.get("discovered_problems", [{}])[0].get("freshness_score", "N/A") if self.state.artifacts.get("discovered_problems") else "N/A"
 
-        meeting_context = f"""
+        user_provided = self.state.artifacts.get("user_provided_problem", False)
+        if user_provided:
+            meeting_context = f"""
+Problem: {problem.description}
+Source: USER-PROVIDED REQUIREMENT (direct instruction, not research discovery)
+Target Users: {problem.target_users}
+Potential Solutions: {', '.join(problem.potential_solution_ideas) if problem.potential_solution_ideas else 'None specified'}
+
+NOTE: This is a direct user requirement. Treat as APPROVED scope — evaluate technical feasibility only, not market validity.
+"""
+        else:
+            meeting_context = f"""
 Problem: {problem.description}
 Severity: {problem.severity}
 Target Users: {problem.target_users}
@@ -2293,11 +2304,10 @@ Opposing Viewpoints: {opposing_summary}
             "problem": problem.to_dict(),
             "market_analysis": str(analysis),
             "meeting_outcome": meeting_decision,
-            "bias_flags": bias_summary,
-            "credibility": credibility_summary,
-            "counter_evidence": counter_summary,
-            "opposing_viewpoints": opposing_summary,
-            "freshness_score": freshness,
+            "user_provided_requirement": user_provided,
+            **({"bias_flags": bias_summary, "credibility": credibility_summary,
+                "counter_evidence": counter_summary, "opposing_viewpoints": opposing_summary,
+                "freshness_score": freshness} if not user_provided else {}),
         }
         result = await self.ceo.execute_task(eval_task)
 
@@ -3727,7 +3737,7 @@ Code Execution Results: {execution_summary}{confidence_note}{cto_peer_note}
         console.agent_action("DataAnalyst", "Scoring Credibility", "LLM-powered credibility assessment...")
         credibility_task = {
             "type": "score_credibility",
-            "findings": str(validated[:5]),  # Top 5 for LLM analysis (token-efficient)
+            "findings": validated[:5],  # Top 5 for LLM analysis (token-efficient)
             "sources": list({s for p in validated for s in p.get("sources", [])})
         }
         cred_result = await self.data_analyst.execute_task(credibility_task)
@@ -4733,8 +4743,8 @@ Error: {self.state.error or 'None'}
             {"id": "research", "name": "Research"},
             {"id": "data_analysis", "name": "Data Analysis"},
             {"id": "analysis", "name": "Analysis"},
-            {"id": "opportunity", "name": "Opportunity Eval"},
-            {"id": "design", "name": "Technical Design"},
+            {"id": "opportunity_evaluation", "name": "Opportunity Eval"},
+            {"id": "technical_design", "name": "Technical Design"},
             {"id": "design_review", "name": "Design Review"},
             {"id": "implementation", "name": "Implementation"},
             {"id": "code_execution", "name": "Code Execution"},

@@ -15,60 +15,41 @@ from utils.error_recovery import ErrorRecoverySystem, PartialSuccessHandler
 
 DEVELOPER_SYSTEM_PROMPT = """You are the Lead Developer. You write working code that solves the stated problem.
 
-Your priorities (in order):
-1. Make it work — code must be functional and solve the problem
-2. Make it clear — readable, well-structured, obvious naming
-3. Make it complete — include all files needed to run (entry point, dependencies, README)
+Before writing code:
+- State the root cause of the problem in one sentence. Every function must trace back to it.
+- Trace the data flow mentally from input to output. Identify edge cases before touching the keyboard.
 
-Engineering Discipline: Write code you would be proud to show in a code review. Every function should have a clear single purpose. Every error should be handled, not silenced.
+Priorities (in order):
+1. Works — functional, solves the stated problem
+2. Clear — obvious naming, single-purpose functions, no deep nesting (>3 levels)
+3. Complete — all files needed to run: entry point, requirements.txt, README with run command
 
-First-Principles Coding: Before writing code, understand the problem completely. Trace the data flow mentally from input to output. Only then write the code.
+Output rules:
+- Always output complete, runnable files. Never partial snippets or pseudocode.
+- Format: FILE: path/to/file.ext followed by a code block.
+- When fixing feedback: re-output the complete corrected file.
+- End every response with: CONFIDENCE: X.X (0.0=uncertain, 1.0=certain it works)
 
-Error Handling Philosophy: Handle errors at the boundary where you can do something useful about them. Do not catch exceptions just to re-raise them. Do not silently swallow errors.
+Error handling: Handle errors at the boundary where you can do something useful. Do not swallow exceptions silently. Error messages must be human-readable, not raw tracebacks.
 
-Testing Mindset: Write code that is easy to test. Pure functions over side effects. Dependency injection over hard-coded dependencies. If a function is hard to test, it is doing too much.
+Fix discipline: (1) Reproduce the bug, (2) Find the root cause, (3) Fix the root cause not the symptom, (4) Verify nothing else broke.
 
-Fix Discipline: When fixing bugs: (1) Reproduce the bug first, (2) Understand WHY it happened, (3) Fix the root cause not the symptom, (4) Verify the fix does not break anything else.
+Avoid: deep nesting, magic numbers, copy-paste code, premature optimization, God classes.
+Prefer: pure functions, explicit dependencies, stdlib over third-party when possible.
 
-Anti-Pattern Awareness: Avoid: God classes, deep nesting (>3 levels), magic numbers, copy-paste code, premature optimization, stringly-typed interfaces.
-
-Rules:
-- Always output complete, runnable files. Never output partial snippets or pseudocode.
-- Output each file as: FILE: path/to/file.ext followed by a code block. Both **File Path:** and FILE: formats work.
-- When fixing bugs or addressing feedback, re-output the complete corrected file, not just the diff.
-- Keep solutions simple. A working 50-line script beats an over-engineered 500-line framework.
-
-When fixing issues from QA or CEO feedback:
-- Read the feedback carefully — fix exactly what was flagged
-- Re-generate the affected files with corrections applied
-- If the feedback is vague, improve the most likely problem areas (error handling, missing functionality)
-
-Root Cause Implementation: Before writing code, state the root cause of the problem in one sentence. Every function you write must trace back to addressing that root cause. Code that doesn't serve the root cause gets deleted.
-
-Working Incrementally: Build the smallest thing that proves the core works first. Then add features one at a time. Never write all files at once and hope they work together.
-
-Self-Testing: After writing each file, mentally execute it line by line. What happens with empty input? What happens with the largest reasonable input? Fix issues before outputting.
-
-Test-Driven Development: Write the test FIRST, then the implementation. If you cannot write the test, you do not understand the requirement.
-
-Code Review Self-Check: Before submitting: (1) Would I approve this in a code review? (2) Is every function under 30 lines? (3) Are there any hardcoded values that should be config?
-
-Dependency Justification: For each import or external dependency, state why the standard library is not sufficient.
-
-Done Checklist: Before submitting: (1) Every file runs without import errors, (2) Entry point works with the exact command in README, (3) No hardcoded paths, secrets, or debug print statements remain, (4) Error messages are human-readable, not raw tracebacks.
-
-Confidence Declaration: At the END of every implementation response, add a line: "CONFIDENCE: X.X" where X.X is 0.0–1.0. Be honest. 0.9+ means you are certain it works. Below 0.6 means you have serious doubts — flag the uncertain part explicitly so QA knows where to focus.
-
-Generate clean, well-structured scaffolding code. Use standard patterns and libraries. Add TODO comments where business logic needs human implementation. Mark incomplete sections clearly with # TODO: <what needs to be done>.
+Done criteria — before submitting, verify:
+1. Every file runs without import errors
+2. Entry point works with the exact command in README
+3. No hardcoded paths, secrets, or debug prints
+4. Error messages are human-readable
 """
 
 DEVELOPER_FIRST_PRINCIPLES = [
-    "INPUT-OUTPUT TRACE: Start at the entry point. For EVERY possible input, trace to the output. Does it produce the correct result? Does it handle invalid input? Does it handle edge cases (empty, null, huge)?",
-    "DEPENDENCY MINIMALISM: List every import. For each: is it in stdlib? If not, is it essential? Could you write the 10 lines yourself instead of importing a library?",
-    "ERROR PATH AUDIT: For every external call (file I/O, network, user input), what happens on failure? If the answer is 'crash' or 'undefined', fix it.",
-    "READABILITY TEST: Could a developer who has never seen this code understand what it does in 60 seconds? If not, rename variables, extract functions, add a one-line comment.",
-    "COMPLETENESS CHECK: Can someone clone this repo and run it with ONLY what is in the output? requirements.txt, entry point, README with run command — all present?",
-    "ROOT CAUSE TRACE: State the root cause. For every function, answer: 'How does this address the root cause?' If it does not, delete it.",
+    "INPUT-OUTPUT TRACE: Start at entry point. For every input (empty, null, huge, invalid), trace to output. Does it produce the correct result or a clear error?",
+    "DEPENDENCY AUDIT: For each non-stdlib import — is it essential? Could 10 lines of stdlib code replace it?",
+    "ERROR PATH: For every external call (file I/O, network, user input) — what happens on failure? 'crash' or 'undefined' = fix it.",
+    "READABILITY: Could a developer unfamiliar with this code understand each function in 30 seconds? If not, rename or extract.",
+    "COMPLETENESS: Can someone clone and run with only what is in the output? requirements.txt + entry point + README with run command — all present?",
 ]
 
 
@@ -333,11 +314,6 @@ complete code here
 ```
 
 {self._get_principles_checklist()}
-Before outputting, mentally trace through the code:
-- Does the entry point exist and call the right functions?
-- Are all imports present and correct?
-- Would `python main.py` (or equivalent) actually run?
-
 BEFORE YOU FINISH, self-check:
 - [ ] Does every file have complete, runnable code (no TODOs, no stubs)?
 - [ ] Is there a clear entry point a user can run?
@@ -648,21 +624,13 @@ SELF-CHECK:
         language = task.get("language", "python")
         context = task.get("context", "")
 
-        prompt = f"""
-Write {language} code for this requirement:
+        prompt = f"""Write {language} code for this requirement.
 
 {requirement}
 
-Context:
-{context}
+Context: {context}
 
-Provide:
-1. Complete, working code
-2. Comments explaining key parts
-3. Example usage
-4. Any assumptions made
-
-Write clean, production-ready code.
+Output complete, working code with example usage. Note any assumptions.
 """
 
         response = await self.generate_response_async(prompt)
@@ -717,11 +685,6 @@ SELF-CHECK:
 - Did I fix every issue in the feedback?
 - Is each file complete and runnable?
 - Did I avoid changing unrelated code?
-
-Before outputting, mentally trace through the code:
-- Does the entry point exist and call the right functions?
-- Are all imports present and correct?
-- Would `python main.py` (or equivalent) actually run?
 """
 
         response = await self.generate_response_async(prompt)
@@ -840,29 +803,15 @@ Use proper test naming conventions and include docstrings.
         file_path = task.get("file_path", "")
         goals = task.get("goals", ["improve readability", "reduce complexity"])
 
-        prompt = f"""
-Refactor this code:
+        prompt = f"""Refactor this code without changing behaviour.
 
 File: {file_path}
+Goals: {', '.join(goals)}
 ```
 {code}
 ```
 
-Refactoring Goals:
-{chr(10).join(f'- {g}' for g in goals)}
-
-Please:
-1. Provide refactored code
-2. Explain each change made
-3. Note any breaking changes
-4. Suggest further improvements
-
-Maintain existing functionality while improving code quality.
-
-Before outputting, mentally trace through the code:
-- Does the entry point exist and call the right functions?
-- Are all imports present and correct?
-- Would `python main.py` (or equivalent) actually run?
+Output the refactored code, list each change, and note any breaking changes.
 """
 
         response = await self.generate_response_async(prompt)
@@ -1312,35 +1261,20 @@ Provide clean, working code only (no explanation needed).
 
     def explain_code(self, code: str) -> str:
         """Explain what code does."""
-        prompt = f"""
-Explain this code:
+        prompt = f"""Explain this code: high-level purpose, step-by-step logic, and any notable issues.
 
 ```
 {code}
 ```
-
-Provide:
-1. High-level overview
-2. Step-by-step walkthrough
-3. Key concepts used
-4. Potential issues or improvements
 """
         return self.generate_response(prompt)
 
     def suggest_improvements(self, code: str) -> str:
         """Suggest improvements for code."""
-        prompt = f"""
-Review this code and suggest improvements:
+        prompt = f"""Suggest concrete improvements for performance, clarity, error handling, and security.
 
 ```
 {code}
 ```
-
-Consider:
-- Performance optimizations
-- Code clarity
-- Error handling
-- Security
-- Best practices
 """
         return self.generate_response(prompt, use_first_principles=True)

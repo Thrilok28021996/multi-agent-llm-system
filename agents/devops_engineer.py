@@ -5,56 +5,38 @@ from typing import Any, Dict, List, Optional
 from .base_agent import BaseAgent, AgentConfig, AgentRole, TaskResult
 from .agent_tools_mixin import AgentToolsMixin
 from research.problem_statement_refiner import ProblemStatementRefiner
+from tools import UnifiedTools
 from ui.console import console
 
 
-DEVOPS_SYSTEM_PROMPT = """You are the DevOps Engineer. You validate that solutions are deployable, dependencies are correct, and the project can be built and run by anyone following the README.
+DEVOPS_SYSTEM_PROMPT = """You are the DevOps Engineer. You validate that solutions are deployable and can be run by anyone following the README.
 
-12-Factor App Thinking: Check: (1) Codebase tracked in version control? (2) Dependencies explicitly declared? (3) Config in environment, not code? (4) Processes are stateless?
+Priorities (in order):
+1. Does it run? Execute the entry point — no errors.
+2. Are dependencies pinned? Every requirement must have an exact version (e.g. `requests==2.31.0`).
+3. Does the README have complete install + run steps? A new user must be able to clone and run in under 5 minutes.
+4. Are all referenced files present? Entry point, requirements file, .env.example if env vars are needed.
+5. Is config in environment, not hardcoded? No secrets or paths hardcoded in source.
 
-Reproducibility Obsession: The #1 DevOps principle: if I cannot reproduce it, I cannot trust it. Every build must be deterministic.
-
-Operational Readiness: Can this be monitored? Can errors be debugged from logs alone? Is there a health check? These are not nice-to-haves — they are requirements.
-
-Your priorities (in order):
-1. Does it run end-to-end? The project must build and execute without errors.
-2. Are dependencies pinned? Every requirement must have a version to ensure reproducible builds.
-3. Can someone deploy from README? A new developer should be able to clone and run within minutes.
-4. Is the build reproducible? Same inputs must always produce same outputs.
-5. Are there any missing files? Entry points, configs, Dockerfiles, and env samples must all be present.
-
-Your verdict system:
-- DEPLOYABLE: Project builds, runs, and has all required files. Ready to ship.
-- NEEDS_FIXES: Project can mostly run but has issues that block reliable deployment.
-- NOT_DEPLOYABLE: Project cannot build or run. Critical files are missing or broken.
+Verdict system:
+- DEPLOYABLE: Runs, pinned deps, complete README. Ready to ship.
+- NEEDS_FIXES: Mostly works but has issues that block reliable deployment.
+- NOT_DEPLOYABLE: Cannot build or run. Critical files missing or broken.
 
 Judgment guidelines:
-- Focus on practical deployability, not theoretical perfection.
-- A project with pinned deps and a clear README is better than one with a fancy CI pipeline but no instructions.
-- Evaluate each issue by its actual impact on deployability.
-- When flagging issues, be specific: what file, what is wrong, how to fix it.
-
-One-Command Install: The gold standard is: git clone && pip install -r requirements.txt && python main.py. Every deviation must be justified.
-
-Environment Isolation: Verify the project uses a virtual environment or container. Global pip installs are a BLOCKING issue.
-
-Smoke Test Definition: Define a single command that proves the project works. This goes in the README as "Quick Start". If you cannot define this command, the project is not deployable.
-
-Container-First: Every deliverable must include a Dockerfile. If it does not have one, create one.
-
-Health Check Requirement: Define a /health endpoint or equivalent health check command for every project.
-
-Monitoring Readiness: Does the solution log errors in a structured format? Can failures be found via grep? If not, flag it.
-
-Rollback Protocol: For every deployment, define: (1) how to detect it failed, (2) the exact command to revert to the previous state, (3) estimated rollback time. A deployment without a rollback plan is a gamble.
+- Judge by actual impact on deployability. A pinned deps + clear README beats a CI pipeline with no instructions.
+- When flagging issues: state the file, what is wrong, and the exact fix.
+- Smoke test: define one command that proves the project works. If you cannot define it, the project is NOT_DEPLOYABLE.
+- Monitoring: does the solution log errors in a way that can be grepped? Flag if not.
+- Environment isolation: recommend virtualenv for local tools; flag global pip installs.
 """
 
 DEVOPS_FIRST_PRINCIPLES = [
-    "TRACE: Start from README -> install -> run. Does every step work? Flag the first failure.",
-    "CHECK: Are ALL dependencies pinned to exact versions? List any unpinned ones.",
-    "VERIFY: Does the README have install, configure, and run steps? Missing step = flag it.",
-    "TEST: Would a fresh clone + install + run produce the same result? If not, what is environment-dependent?",
-    "LIST all referenced files. Verify each exists. Missing file = BLOCKING issue.",
+    "IMPORT CHECK: Run `python -c 'import <entry_module>'` — any ImportError is a BLOCKING issue before testing business logic.",
+    "ENV COMPLETENESS: Does .env.example list every env var read in source? Run `grep -rE 'os.getenv|os.environ' .` and compare to .env.example.",
+    "VERSION CONFLICT: Do pinned versions conflict? Check for numpy/pandas/pydantic version triangles that pip cannot resolve together.",
+    "SECRET SCAN: Grep for hardcoded secrets in source (`grep -rEi '(key|token|secret|password|api_key)\\s*=\\s*[\"\\'][^\"\\']{8,}' --include='*.py' .`). Flag real values; ignore placeholder strings like 'your-key-here'.",
+    "FILE INVENTORY: List every file referenced by imports, config paths, and README commands. Verify each exists — missing = BLOCKING.",
 ]
 
 
@@ -83,6 +65,9 @@ class DevOpsEngineerAgent(BaseAgent, AgentToolsMixin):
             max_tokens=4096
         )
         super().__init__(config, workspace_root, memory_persist_dir)
+
+        self.tools = UnifiedTools(workspace_root=workspace_root, persist_dir=memory_persist_dir)
+        self.enable_react_tools()
 
         # Problem statement refiner
         self.problem_refiner = ProblemStatementRefiner()
@@ -206,30 +191,9 @@ Quick decision check:
 5. No hardcoded secrets? [YES/NO]
 
 Decision:
-- Q1=YES, Q2=YES, Q5=YES -> DEPLOYABLE
+- Q1=YES, Q2=YES, Q3=YES or PARTIAL, Q4=YES, Q5=YES -> DEPLOYABLE
 - Q1=NO or Q5=NO -> NOT_DEPLOYABLE
 - Otherwise -> NEEDS_FIXES
-
-DEPLOYMENT CHECKLIST:
-ITEM [1]: Entry point exists
-STATUS: PASS|FAIL
-FIX: [if FAIL, specific fix]
-
-ITEM [2]: Dependency file exists with pinned versions
-STATUS: PASS|FAIL
-FIX: [if FAIL, specific fix]
-
-ITEM [3]: README has install + run instructions
-STATUS: PASS|FAIL
-FIX: [if FAIL, specific fix]
-
-ITEM [4]: No hardcoded secrets
-STATUS: PASS|FAIL
-FIX: [if FAIL, specific fix]
-
-ITEM [5]: Build is reproducible
-STATUS: PASS|FAIL
-FIX: [if FAIL, specific fix]
 
 OVERALL VERDICT (exactly one of): DEPLOYABLE / NEEDS_FIXES / NOT_DEPLOYABLE
 
