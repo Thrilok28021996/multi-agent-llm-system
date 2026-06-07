@@ -64,6 +64,7 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | Subsystem | Module | Responsibility |
 |---|---|---|
 | Workflow engine | `orchestrator/workflow.py` | Phase-gated execution graph across 13 defined phases |
+| Plan mode | `orchestrator/plan_mode.py` | Claude Code-style planning with human approval steps |
 | Message bus | `orchestrator/message_bus.py` | Priority-queued async pub/sub between agents |
 | Escalation | `orchestrator/escalation.py` | Auto-retry and fallback; systemic failure routing after round 4 |
 | Structured debate | `collaboration/debate.py` | N-round argumentation with synthesis; used for architecture decisions |
@@ -71,7 +72,10 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | Critic ensemble | `collaboration/critic_ensemble.py` | Multiple agents critique same artifact independently |
 | Thinking engine | `agents/thinking.py` | Configurable reasoning depth: MINIMAL → STANDARD → DEEP → EXHAUSTIVE |
 | Tree of Thoughts | `agents/tree_of_thoughts.py` | Generates N solution branches, scores each, executes best |
+| HyperTree planner | `agents/hypertree_planner.py` | Hierarchical task decomposition across parallel sub-trees |
 | ReAct loop | `agents/react_loop.py` | Reason → Act → Observe for tool-using agents |
+| Agent tools | `agents/agent_tools_mixin.py` | 13 Claude Code-style tools: read/write/grep/bash/LSP/git/format/test |
+| Personality | `agents/personality.py` | Per-agent personality traits + career progression across runs |
 | RAG store | `memory/rag_store.py` | Local TF-IDF retrieval; no GPU; reuses patterns from past runs |
 | Problem discovery | `research/problem_discoverer.py` | Autonomously generates tasks from web content; no manual prompt needed |
 
@@ -119,16 +123,14 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | Category | Technology |
 |---|---|
 | **LLM Backend** | [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.ai) — fully local, no API keys |
-| **Default Models** | Reasoning: `Qwen3.5-9B` · Code: `Qwen2.5-Coder-7B` · QA: `DeepSeek-R1-Distill-Qwen-7B` |
-| **Model Config** | Per-role assignments via `.env` — change one line, reflects everywhere |
 | **Orchestration** | Custom Python phase-gated workflow engine (13 phases) |
-| **Reasoning** | Adaptive CoT · Tree of Thoughts · ReAct loop · First-principles thinking |
+| **Reasoning** | Adaptive CoT · Tree of Thoughts · HyperTree planner · ReAct loop · First-principles thinking |
 | **Collaboration** | Structured debate · Agent meetings · Critic ensemble · MoA aggregator |
 | **Memory** | Local TF-IDF RAG · session memory · shared context · cross-session learning |
 | **Web Research** | BeautifulSoup4 · async scraper · credibility scorer · cross-validator |
-| **Tools** | LSP integration · git tools · code formatter · test runner |
+| **Tools** | LSP integration · git tools · code formatter · test runner (13-tool mixin) |
 | **Logging** | Structured JSON logs · usage tracker · progress tracker · health checker |
-| **UI** | Rich terminal · streaming output · interactive mode |
+| **UI** | Rich terminal · streaming output · interactive conversational mode |
 
 ---
 
@@ -138,11 +140,15 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 
 ```bash
 # 1. Clone
-git clone https://github.com/Thrilok28021996/autonomous-company-orchestrator.git
-cd autonomous-company-orchestrator
+git clone https://github.com/Thrilok28021996/multi-agent-llm-company-system.git
+cd multi-agent-llm-company-system
 
 # 2. Install dependencies
 pip install -r requirements.txt
+
+# Optional: install as a CLI command
+pip install -e .
+# Then use: multi-agent-llm-company-system "Build a CLI tool..."
 
 # 3. Configure
 cp .env.example .env
@@ -163,6 +169,7 @@ LMSTUDIO_HOST=http://localhost:1234/v1
 
 # Per-role model IDs (LM Studio model identifier)
 LMSTUDIO_MODEL_CEO=Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF
+LMSTUDIO_MODEL_CTO=Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF
 LMSTUDIO_MODEL_DEVELOPER=lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF
 LMSTUDIO_MODEL_QA_ENGINEER=lmstudio-community/DeepSeek-R1-Distill-Qwen-7B-GGUF
 # ... (see .env.example for all 9 roles)
@@ -176,34 +183,70 @@ Open LM Studio → Local Server tab → Start Server. Models are auto-loaded on 
 # In .env
 LLM_BACKEND=ollama
 MODEL_CEO=qwen3.5:9b-q4_K_M
-MODEL_DEVELOPER=qwen2.5-coder:7b
+MODEL_DEVELOPER=qwen2.5-coder:14b
 # ... (see .env.example for all 9 roles)
 
 # Pull required models
 ollama pull qwen3.5:9b-q4_K_M
-ollama pull qwen2.5-coder:7b
+ollama pull qwen2.5-coder:14b
 ```
 
 ### Recommended Models (16GB RAM)
 
+#### LM Studio
+
 | Tier | Model | RAM | Used By |
 |---|---|---|---|
-| Reasoning | Qwen3.5-9B Q4_K_M | ~5.6GB | CEO, CTO, PM, Researcher, DataAnalyst |
-| Code | Qwen2.5-Coder-7B Q4_K_M | ~4.4GB | Developer, DevOps, Security |
-| QA | DeepSeek-R1-Distill-Qwen-7B Q4_K_M | ~4.4GB | QA Engineer |
+| Reasoning | `Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF` Q4_K_M | ~5.6GB | CEO, CTO, PM, Researcher, DataAnalyst |
+| Code | `lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF` Q4_K_M | ~4.4GB | Developer, DevOps, Security |
+| QA | `lmstudio-community/DeepSeek-R1-Distill-Qwen-7B-GGUF` Q4_K_M | ~4.4GB | QA Engineer |
 
-3 models total. LM Studio swaps on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
+LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
+
+#### Ollama
+
+| Tier | Model | RAM | Used By |
+|---|---|---|---|
+| Reasoning | `qwen3.5:9b-q4_K_M` | ~5.6GB | CEO, CTO, PM, Researcher, DataAnalyst |
+| Code | `qwen2.5-coder:14b` | ~8.9GB | Developer, DevOps, Security, QA |
 
 ### All CLI Modes
 
 | Mode | Command |
 |---|---|
 | Run with problem statement | `python main.py "Build a REST API for user auth"` |
-| Enhance existing codebase | `python main.py "Add tests" --current-dir` |
-| Autonomous problem discovery | `python main.py --discover` |
-| Interactive session | `python main.py --interactive` |
+| Auto-discover and solve problems | `python main.py --run` |
+| Problem discovery only | `python main.py --discover` |
+| Scaffold (skip research, fast path) | `python main.py --scaffold "FastAPI CRUD app for todos"` |
+| Enhance existing codebase | `python main.py --enhance ./myproject "Add authentication"` |
+| Batch multiple problems | `python main.py --problems "Build X" "Fix Y" "Create Z"` |
+| Continuous loop mode | `python main.py --continuous` |
+| Interactive conversational mode | `python main.py` (no arguments) |
+| Human approval at decision points | `python main.py "..." --approve` |
+| Resume from checkpoint | `python main.py --resume` |
+| Resume specific session | `python main.py --session-id abc123` |
+| Re-run past solution | `python main.py --rerun 3` |
 | Check loaded models | `python main.py --check-models` |
 | Switch backend at runtime | `python main.py "..." --backend lmstudio` |
+| Design only, skip code execution | `python main.py "..." --dry-run` |
+| Skip web research | `python main.py "..." --offline` |
+| List past solutions | `python main.py --list-solutions` |
+| List sessions | `python main.py --list-sessions` |
+| Export solution as zip | `python main.py --export 3` |
+| Rate a solution | `python main.py --feedback 3 good` |
+| Generate default config.yaml | `python main.py --generate-config` |
+| Target output directory | `python main.py "..." --target ./output` |
+| Set programming language | `python main.py "..." --language typescript` |
+| Set problem domain | `python main.py "..." --domain business` |
+| Cap token budget | `python main.py "..." --max-tokens 50000` |
+| Limit approval rounds | `python main.py "..." --max-rounds 3` |
+| Time-based hard stop | `python main.py "..." --max-workflow-minutes 30` |
+| Disable escalation system | `python main.py "..." --no-escalation` |
+| Skip security review phase | `python main.py "..." --no-security` |
+| Skip retrospective phase | `python main.py "..." --no-retrospective` |
+| Allow partial delivery | `python main.py "..." --force-stop` |
+| Debug output | `python main.py "..." --verbose` |
+| Suppress output | `python main.py "..." --quiet` |
 
 ### Environment Variables
 
@@ -212,9 +255,29 @@ ollama pull qwen2.5-coder:7b
 | `LLM_BACKEND` | `ollama` | `ollama` or `lmstudio` |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `LMSTUDIO_HOST` | `http://localhost:1234/v1` | LM Studio server URL |
-| `MODEL_<ROLE>` | see `config/models.py` | Ollama model tag per role |
-| `LMSTUDIO_MODEL_<ROLE>` | see `config/models.py` | LM Studio model ID per role |
+| `MODEL_<ROLE>` | `goekdenizguelmez/JOSIEFIED-Qwen3:8b` etc. | Ollama model tag per role — override via `.env` (see `.env.example` for recommended values) |
+| `LMSTUDIO_MODEL_<ROLE>` | same as above | LM Studio model ID per role — override via `.env` (see `.env.example` for recommended values) |
 | `LLM_MAX_CONCURRENCY` | `2` | Max concurrent LLM calls (raise for high-RAM setups) |
+| `MULTI_AGENT_LLM_DATA_DIR` | `~/.multi-agent-llm-company-system` | Internal data dir (logs, memory, reports) |
+| `COMPANY_AGI_OUTPUT_DIR` | `output/solutions` | Generated code output directory |
+| `COMPANY_AGI_RUN_TESTS` | `true` | Run tests after code generation |
+| `COMPANY_AGI_STREAMING` | `true` | Enable streaming LLM output |
+| `RATE_LIMIT_DELAY` | `2.0` | Seconds between LLM requests |
+| `LOG_LEVEL` | `INFO` | Logging verbosity |
+
+### Config File
+
+Generate a `config.yaml` template (auto-discovered in CWD on startup):
+
+```bash
+python main.py --generate-config
+```
+
+The config file supports all workflow settings — model assignments, token budgets, output directories, and more. CLI flags override config file values. Supported filenames: `config.yaml`, `config.yml`, `config.json`, `.multi-agent-llm-company-system.yaml`.
+
+### Internal Data Directory
+
+All internal state (logs, memory, session data, reports) is stored in `~/.multi-agent-llm-company-system/`. Override with `MULTI_AGENT_LLM_DATA_DIR`. Generated code goes to `output/solutions/` (or `--target` / `--output-dir`).
 
 ---
 
@@ -226,12 +289,16 @@ autonomous-company-orchestrator/
 │   ├── base_agent.py        # Adaptive CoT, retry logic, semaphore, context trimming
 │   ├── thinking.py          # Configurable reasoning depth engine
 │   ├── tree_of_thoughts.py  # Branch-score-execute reasoning
+│   ├── hypertree_planner.py # Hierarchical task decomposition across sub-trees
 │   ├── react_loop.py        # Reason-Act-Observe for tool agents
+│   ├── agent_tools_mixin.py # 13-tool Claude Code-style mixin (read/write/grep/bash/git/LSP/fmt)
+│   ├── personality.py       # Per-agent personality traits + career progression
 │   └── ceo · cto · researcher · product_manager · developer
 │       qa_engineer · security_engineer · devops_engineer · data_analyst
 │
 ├── orchestrator/            # Pipeline engine
 │   ├── workflow.py          # 13-phase execution graph
+│   ├── plan_mode.py         # Planning with human approval steps
 │   ├── message_bus.py       # Priority-queued async agent communication
 │   ├── task_manager.py      # Task lifecycle and priority
 │   ├── escalation.py        # Failure routing and systemic review triggers
@@ -260,6 +327,7 @@ autonomous-company-orchestrator/
 │
 ├── research/                # Autonomous problem discovery
 │   ├── problem_discoverer.py
+│   ├── sources.py           # Configurable research sources (Reddit, HN, etc.)
 │   ├── web_scraper.py · web_search.py
 │   ├── credibility.py       # Source credibility scoring (0–1)
 │   └── cross_validator.py
@@ -267,6 +335,7 @@ autonomous-company-orchestrator/
 ├── config/                  # Model, role, and backend configuration
 │   ├── models.py            # Per-role ModelSpec; env-var override system
 │   ├── llm_client.py        # Unified LM Studio + Ollama client
+│   ├── config_loader.py     # YAML/JSON config file loader
 │   ├── settings.py          # Global settings with env overrides
 │   └── roles.py · validation.py
 │
@@ -276,7 +345,8 @@ autonomous-company-orchestrator/
 ├── docs/assets/             # Org chart · execution flow · terminal screenshots
 ├── tests/
 ├── .env.example             # Full backend + model configuration template
-├── main.py                  # CLI entry point
+├── main.py                  # CLI entry point (also: multi-agent-llm-company-system)
+├── interactive_mode.py      # Standalone interactive coding session
 └── requirements.txt
 ```
 
