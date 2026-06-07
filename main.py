@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Company AGI - Autonomous Multi-Agent System
+Multi Agent LLM Company System
 
 A fully autonomous AGI that simulates a company workflow using local LLMs via Ollama.
 Install Ollama: https://ollama.ai  |  Start server: ollama serve
@@ -520,7 +520,7 @@ def export_solution(solution_id: int) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Company AGI - Autonomous Multi-Agent System",
+        description="Multi Agent LLM Company System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

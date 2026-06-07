@@ -1,5 +1,5 @@
 """
-Streaming Output for Company AGI.
+Streaming Output for Multi Agent LLM Company System.
 
 Provides Claude Code-style streaming with:
 - Real-time response display

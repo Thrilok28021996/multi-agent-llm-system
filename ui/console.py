@@ -42,7 +42,7 @@ class AgentState:
 
 class CompanyConsole:
     """
-    Rich console UI for Company AGI.
+    Rich console UI for Multi Agent LLM Company System.
     Provides real-time streaming output of agent activities.
     """
 
@@ -442,8 +442,8 @@ class CompanyConsole:
         """Print the main application header."""
         self.console.print()
         self.console.print(Panel(
-            "[bold cyan]COMPANY AGI[/]\n"
-            "[dim]Autonomous Multi-Agent System[/]",
+            "[bold cyan]MULTI AGENT LLM COMPANY SYSTEM[/]\n"
+            "[dim]AI agents that collaborate to discover and solve problems[/]",
             border_style="cyan",
             padding=(1, 2)
         ))

@@ -1,4 +1,4 @@
-"""UI module for Company AGI."""
+"""UI module for Multi Agent LLM Company System."""
 
 from .console import CompanyConsole, console, AgentStatus
 from .logger import ConversationLogger, logger

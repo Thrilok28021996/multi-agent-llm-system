@@ -1,4 +1,4 @@
-# Autonomous Company Orchestrator
+# Multi Agent LLM Company System
 
 **A hierarchical autonomous AI organization composed of role-specialized agents that independently discover problems, delegate execution, debate solutions, enforce quality rejection, and synthesize final outcomes — with persistent memory and RAG-backed context.**
 
@@ -31,7 +31,7 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | No governance | Anyone can approve anything — there is no rejection gate |
 | No memory | Every run starts from zero |
 
-**Autonomous Company Orchestrator** addresses each failure directly:
+**Multi Agent LLM Company System** addresses each failure directly:
 
 - **Role separation** — nine agents with dedicated system prompts, temperatures, and model assignments
 - **Internal criticism** — Critic Ensemble and DebateOrchestrator challenge outputs before they reach the CEO
@@ -252,7 +252,7 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_BACKEND` | `ollama` | `ollama` or `lmstudio` |
+| `LLM_BACKEND` | `lmstudio` | `ollama` or `lmstudio` (code default: `ollama`; `.env.example` ships with `lmstudio`) |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `LMSTUDIO_HOST` | `http://localhost:1234/v1` | LM Studio server URL |
 | `MODEL_<ROLE>` | `goekdenizguelmez/JOSIEFIED-Qwen3:8b` etc. | Ollama model tag per role — override via `.env` (see `.env.example` for recommended values) |
@@ -284,7 +284,7 @@ All internal state (logs, memory, session data, reports) is stored in `~/.multi-
 ## Project Structure
 
 ```
-autonomous-company-orchestrator/
+multi-agent-llm-company-system/
 ├── agents/                  # Nine specialist agents + shared base
 │   ├── base_agent.py        # Adaptive CoT, retry logic, semaphore, context trimming
 │   ├── thinking.py          # Configurable reasoning depth engine

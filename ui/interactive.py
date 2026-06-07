@@ -1,5 +1,5 @@
 """
-Interactive User Interface Tools for Company AGI.
+Interactive User Interface Tools for Multi Agent LLM Company System.
 
 Provides Claude Code-style interactive features:
 - AskUserQuestion tool for clarification
