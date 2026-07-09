@@ -1,0 +1,5 @@
+
+TITLE: Progress
+
+** todo Path file to be the current file
+** todo make it a python package where we can run it directly on the terminal
