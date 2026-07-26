@@ -208,6 +208,8 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 | Enhance existing codebase | `python main.py --enhance ./myproject "Add authentication"` |
 | Batch multiple problems | `python main.py --problems "Build X" "Fix Y" "Create Z"` |
 | Continuous loop mode | `python main.py --continuous` |
+| Set continuous loop delay | `python main.py --continuous --continuous-delay 30` |
+| Max iterations in continuous mode | `python main.py --continuous --max-iterations 5` |
 | Interactive conversational mode | `python main.py` (no arguments) |
 | Human approval at decision points | `python main.py "..." --approve` |
 | Resume from checkpoint | `python main.py --resume` |
@@ -217,6 +219,7 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 | Switch backend at runtime | `python main.py "..." --backend lmstudio` |
 | Show real-time thinking panels | `python main.py "..." --show-thinking` |
 | Hide real-time thinking panels | `python main.py "..." --hide-thinking` |
+| Specify custom config file | `python main.py "..." --config ./custom.yaml` |
 | Design only, skip code execution | `python main.py "..." --dry-run` |
 | Skip web research | `python main.py "..." --offline` |
 | List past solutions | `python main.py --list-solutions` |
@@ -225,6 +228,8 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 | Rate a solution | `python main.py --feedback 3 good` |
 | Generate default config.yaml | `python main.py --generate-config` |
 | Target output directory | `python main.py "..." --target ./output` |
+| Output directory override | `python main.py "..." --output-dir ./solutions` |
+| Generate in current directory | `python main.py "..." --current-dir` |
 | Set programming language | `python main.py "..." --language typescript` |
 | Set problem domain | `python main.py "..." --domain business` |
 | Cap token budget | `python main.py "..." --max-tokens 50000` |
