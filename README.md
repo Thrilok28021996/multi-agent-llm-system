@@ -349,19 +349,6 @@ multi-agent-llm-company-system/
 
 ---
 
-## Roadmap
-
-- [ ] Web UI — real-time agent activity, usage dashboard, output browser
-- [ ] OpenAI / Anthropic / Groq backend support
-- [ ] Parallel agent execution for independent pipeline phases
-- [ ] GitHub Actions trigger — invoke pipeline from PR comment
-- [ ] Tool plugin framework for custom agent capabilities
-- [ ] Browser-based execution agents (Playwright integration)
-- [ ] Multi-session long-term project memory
-- [ ] Enterprise workflow integrations (Jira, Linear, Slack)
-
----
-
 ## Engineering Focus Areas Demonstrated
 
 This project explores practical implementations of:
