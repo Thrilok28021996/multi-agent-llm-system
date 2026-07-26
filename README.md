@@ -14,7 +14,7 @@
 
 ![Org Chart](docs/assets/org_chart.svg)
 
-Nine specialists. One org chart. The CEO owns final approval — and rejects 30–40% of first submissions.
+Nine specialists. One org chart. The CEO owns final approval — rejecting submissions that fail validity or scope checks, based on the Developer's confidence score and the CTO/QA/Security review chain.
 
 ---
 
