@@ -29,18 +29,47 @@ if TYPE_CHECKING:
 
 
 def _get_backend() -> str:
-    return os.getenv("LLM_BACKEND", "ollama").lower()
+    backend = os.getenv("LLM_BACKEND") or os.getenv("BACKEND") or "ollama"
+    return backend.lower()
 
 
 # =============================================================================
 #  OLLAMA BACKEND
 # =============================================================================
 
+import re
+
+
+def _is_thinking_enabled() -> bool:
+    val = os.getenv("MODEL_THINKING", os.getenv("ENABLE_THINKING", "false")).lower()
+    return val in ("true", "1", "yes")
+
+
+def _clean_text(text: str) -> str:
+    if not text:
+        return ""
+    # Strip thinking/thought/reasoning/analysis blocks entirely (content + tags)
+    text = re.sub(r'<(think|thinking|thought|reasoning|analysis)>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<(think|thinking|thought|reasoning|analysis)>.*', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<\/?answer>', '', text, flags=re.IGNORECASE)
+    return text.strip()
+
+
 class OllamaBackend:
     """Inference backend using Ollama."""
 
     def _host(self) -> str:
         return os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+    def _get_options(self, temperature: float, max_tokens: int, n_ctx: int) -> Dict:
+        opts = {
+            "temperature": temperature,
+            "num_predict": max_tokens,
+            "num_ctx": n_ctx,
+        }
+        if not _is_thinking_enabled():
+            opts["think"] = False
+        return opts
 
     def chat(
         self,
@@ -52,17 +81,16 @@ class OllamaBackend:
     ) -> Tuple[str, int, int]:
         import ollama as _ollama
         client = _ollama.Client(host=self._host())
-        console.info(f"[Ollama] {model} (ctx={n_ctx})")
+        console.debug(f"[Ollama] {model} (ctx={n_ctx})")
+        options = self._get_options(temperature, max_tokens, n_ctx)
         response = client.chat(
             model=model,
             messages=messages,
-            options={
-                "temperature": temperature,
-                "num_predict": max_tokens,
-                "num_ctx": n_ctx,
-            },
+            options=options,
         )
         text = response.message.content or ""
+        if not _is_thinking_enabled():
+            text = _clean_text(text)
         input_tokens = getattr(response, "prompt_eval_count", 0) or 0
         output_tokens = getattr(response, "eval_count", 0) or 0
         return text, input_tokens, output_tokens
@@ -78,16 +106,13 @@ class OllamaBackend:
     ) -> Tuple[str, int, int]:
         import ollama as _ollama
         client = _ollama.Client(host=self._host())
-        console.info(f"[Ollama] {model} streaming (ctx={n_ctx})")
+        console.debug(f"[Ollama] {model} streaming (ctx={n_ctx})")
+        options = self._get_options(temperature, max_tokens, n_ctx)
         stream = client.chat(
             model=model,
             messages=messages,
             stream=True,
-            options={
-                "temperature": temperature,
-                "num_predict": max_tokens,
-                "num_ctx": n_ctx,
-            },
+            options=options,
         )
         full_response = ""
         input_tokens = 0
@@ -96,10 +121,13 @@ class OllamaBackend:
             delta = chunk.message.content or ""
             if delta:
                 full_response += delta
-                callback(delta)
+                if _is_thinking_enabled() or "<think>" not in delta:
+                    callback(delta)
             if getattr(chunk, "done", False):
                 input_tokens = getattr(chunk, "prompt_eval_count", 0) or 0
                 output_tokens = getattr(chunk, "eval_count", 0) or 0
+        if not _is_thinking_enabled():
+            full_response = _clean_text(full_response)
         return full_response, input_tokens, output_tokens
 
 
@@ -123,7 +151,7 @@ class LMStudioBackend:
         host = os.getenv("LMSTUDIO_HOST", "http://localhost:1234/v1")
         # LM Studio does not require a real API key — any non-empty string works
         self._client = OpenAI(base_url=host, api_key="lm-studio")
-        console.info(f"[LMStudio] backend initialised at {host}")
+        console.debug(f"[LMStudio] backend initialised at {host}")
 
     def chat(
         self,
@@ -133,7 +161,7 @@ class LMStudioBackend:
         max_tokens: int,
         n_ctx: int,  # LM Studio ignores this; context set per-model in its UI
     ) -> Tuple[str, int, int]:
-        console.info(f"[LMStudio] {model}")
+        console.debug(f"[LMStudio] {model}")
         response = self._client.chat.completions.create(
             model=model,
             messages=messages,
@@ -154,7 +182,7 @@ class LMStudioBackend:
         callback: Callable[[str], None],
         n_ctx: int,
     ) -> Tuple[str, int, int]:
-        console.info(f"[LMStudio] {model} streaming")
+        console.debug(f"[LMStudio] {model} streaming")
         stream = self._client.chat.completions.create(
             model=model,
             messages=messages,

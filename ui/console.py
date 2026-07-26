@@ -69,25 +69,38 @@ class CompanyConsole:
     LOG_LEVELS = {"debug": 0, "info": 1, "warning": 2, "error": 3}
 
     def __init__(self):
+        import os
         self.console = Console()
         self.agents: Dict[str, AgentState] = {}
         self.messages: List[Dict[str, Any]] = []
         self.current_phase = "Initializing"
         self.start_time = datetime.now()
         self._log_level = 1  # default: info
+        self._show_thinking = os.getenv("SHOW_THINKING", "false").lower() in ("true", "1", "yes")
 
     def set_log_level(self, level: str) -> None:
         """Set console log level: debug, info, warning, error."""
         self._log_level = self.LOG_LEVELS.get(level, 1)
+
+    def set_show_thinking(self, show: bool) -> None:
+        """Toggle whether agent thinking panels are displayed in console."""
+        self._show_thinking = show
+
+    @property
+    def show_thinking(self) -> bool:
+        return self._show_thinking
 
     def _clean_llm_output(self, text: str) -> str:
         """Clean LLM output by removing thinking tags and other artifacts."""
         if not text:
             return ""
 
-        # Strip Qwen3 native thinking blocks entirely (content + tags)
-        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)  # unclosed tag
+        # Strip thinking/thought/reasoning/analysis blocks entirely (content + tags)
+        text = re.sub(r'<(think|thinking|thought|reasoning|analysis)>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<(think|thinking|thought|reasoning|analysis)>.*', '', text, flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove <answer> wrappers
+        text = re.sub(r'<\/?answer>', '', text, flags=re.IGNORECASE)
 
         # Remove other common artifacts
         text = re.sub(r'<\/?begin.*?>', '', text, flags=re.IGNORECASE)
@@ -95,7 +108,7 @@ class CompanyConsole:
 
         # Remove leading/trailing whitespace and extra newlines
         text = re.sub(r'\n{3,}', '\n\n', text)
-        text = text.strip()
+        return text.strip()
 
         return text
 
@@ -117,20 +130,20 @@ class CompanyConsole:
 
     def agent_thinking(self, agent_name: str, thought: str) -> None:
         """Show agent thinking in real-time."""
-        # Log full thought before cleaning
+        # Log full thought to file logger
         logger.log_agent_thinking(agent_name, thought)
 
-        # Clean the thought output for display
+        # Clean the thought output
         thought = self._clean_llm_output(thought)
 
         if agent_name in self.agents:
             self.agents[agent_name].status = AgentStatus.THINKING
             self.agents[agent_name].thinking = thought
 
-        color = self.AGENT_COLORS.get(agent_name, "white")
-        icon = self.STATUS_ICONS[AgentStatus.THINKING]
-
-        if thought.strip():  # Only show if there's content
+        # Print thinking to console only if SHOW_THINKING is enabled or verbose mode is active
+        if (self._show_thinking or self._log_level <= 0) and thought.strip():
+            color = self.AGENT_COLORS.get(agent_name, "white")
+            icon = self.STATUS_ICONS[AgentStatus.THINKING]
             self.console.print(
                 Panel(
                     Text(thought, style="italic"),
@@ -369,35 +382,30 @@ class CompanyConsole:
         state = {"in_think": False, "buf": ""}
 
         def callback(token: str):
-            # Accumulate partial tags to detect <think> / </think> boundaries
             s = state
             s["buf"] += token
-            # Drain buffer once we have enough chars to detect a complete tag
+            # Drain buffer to detect and strip thinking tag boundaries
             while True:
                 if s["in_think"]:
-                    end = s["buf"].find("</think>")
-                    if end != -1:
+                    m_end = re.search(r'</(think|thinking|thought|reasoning|analysis)>', s["buf"], re.IGNORECASE)
+                    if m_end:
                         s["in_think"] = False
-                        s["buf"] = s["buf"][end + len("</think>"):]
+                        s["buf"] = s["buf"][m_end.end():]
                     else:
-                        # Still inside thinking — discard all but last 8 chars
-                        # (keep a tail in case </think> is split across tokens)
-                        s["buf"] = s["buf"][-8:] if len(s["buf"]) > 8 else s["buf"]
+                        # Still inside thinking — keep tail for split tags
+                        s["buf"] = s["buf"][-16:] if len(s["buf"]) > 16 else s["buf"]
                         break
                 else:
-                    start = s["buf"].find("<think>")
-                    if start != -1:
-                        # Print whatever came before <think>
-                        before = s["buf"][:start]
+                    m_start = re.search(r'<(think|thinking|thought|reasoning|analysis)>', s["buf"], re.IGNORECASE)
+                    if m_start:
+                        before = s["buf"][:m_start.start()]
                         if before:
                             sys.stdout.write(before)
                             sys.stdout.flush()
                         s["in_think"] = True
-                        s["buf"] = s["buf"][start + len("<think>"):]
+                        s["buf"] = s["buf"][m_start.end():]
                     else:
-                        # No <think> in buffer — safe to print all but last 6 chars
-                        # (keep tail in case <think> is split across tokens)
-                        safe_len = max(0, len(s["buf"]) - 6)
+                        safe_len = max(0, len(s["buf"]) - 16)
                         if safe_len:
                             sys.stdout.write(s["buf"][:safe_len])
                             sys.stdout.flush()

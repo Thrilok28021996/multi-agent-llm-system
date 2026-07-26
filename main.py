@@ -742,6 +742,16 @@ Generated code: current directory (override with --output-dir or --target)
         help="Suppress all output except errors and final summary"
     )
     parser.add_argument(
+        "--show-thinking",
+        action="store_true",
+        help="Show real-time agent thinking panels in console"
+    )
+    parser.add_argument(
+        "--hide-thinking",
+        action="store_true",
+        help="Hide real-time agent thinking panels in console"
+    )
+    parser.add_argument(
         "--max-workflow-minutes",
         type=int,
         default=0,
@@ -911,6 +921,12 @@ Generated code: current directory (override with --output-dir or --target)
     if args.backend:
         os.environ["LLM_BACKEND"] = args.backend
         print(f"Using LLM backend: {args.backend}")
+
+    # CLI thinking toggle override
+    if args.show_thinking:
+        console.set_show_thinking(True)
+    elif args.hide_thinking:
+        console.set_show_thinking(False)
 
     # Workspace root defaults to CWD; --target overrides
     workspace_root = os.getcwd()

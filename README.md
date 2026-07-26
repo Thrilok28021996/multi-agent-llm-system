@@ -12,8 +12,6 @@
 
 ## Organizational Hierarchy
 
-![Org Chart](docs/assets/org_chart.svg)
-
 Nine specialists. One org chart. The CEO owns final approval — rejecting submissions that fail validity or scope checks, based on the Developer's confidence score and the CTO/QA/Security review chain.
 
 ---
@@ -42,8 +40,6 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 ---
 
 ## Core Architecture
-
-![Execution Flow](docs/assets/execution_flow.svg)
 
 ### Organizational Layers
 
@@ -100,21 +96,7 @@ Most single-agent and naive multi-agent systems suffer from the same structural 
 | **Dual Backend Support** | Runs on LM Studio or Ollama; switch with one env var; model IDs resolved per backend |
 | **Concurrency Control** | Async + sync semaphores prevent LM Studio queue spikes; configurable via `LLM_MAX_CONCURRENCY` |
 
----
 
-## Sample Runs
-
-### CEO Rejecting Substandard Work
-
-![CEO Rejection](docs/assets/terminal_ceo_rejection.svg)
-
-### Agents Debating Architecture
-
-![Architecture Debate](docs/assets/terminal_debate.svg)
-
-### Session Cost and Activity Report
-
-![Cost Report](docs/assets/terminal_cost_report.svg)
 
 ---
 
@@ -180,11 +162,16 @@ Open LM Studio → Local Server tab → Start Server. Models are auto-loaded on 
 ### Ollama Setup
 
 ```bash
-# In .env
+# In .env (Option A: Individual model per agent role)
 LLM_BACKEND=ollama
+OLLAMA_HOST=http://localhost:11434
 MODEL_CEO=qwen3.5:9b-q4_K_M
 MODEL_DEVELOPER=qwen2.5-coder:14b
-# ... (see .env.example for all 9 roles)
+# ... (or configure all 9 agent roles individually)
+
+# Alternatively (Option B: Single global model fallback for all agents)
+LLM_BACKEND=ollama
+MODEL=qwen2.5-coder:14b
 
 # Pull required models
 ollama pull qwen3.5:9b-q4_K_M
@@ -228,6 +215,8 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 | Re-run past solution | `python main.py --rerun 3` |
 | Check loaded models | `python main.py --check-models` |
 | Switch backend at runtime | `python main.py "..." --backend lmstudio` |
+| Show real-time thinking panels | `python main.py "..." --show-thinking` |
+| Hide real-time thinking panels | `python main.py "..." --hide-thinking` |
 | Design only, skip code execution | `python main.py "..." --dry-run` |
 | Skip web research | `python main.py "..." --offline` |
 | List past solutions | `python main.py --list-solutions` |
@@ -252,11 +241,14 @@ LM Studio swaps models on demand — peak RAM is max(reasoning, code) ≈ 5.6GB.
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_BACKEND` | `lmstudio` | `ollama` or `lmstudio` (code default: `ollama`; `.env.example` ships with `lmstudio`) |
+| `LLM_BACKEND` | `ollama` | `ollama` or `lmstudio` (code default: `ollama`) |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `LMSTUDIO_HOST` | `http://localhost:1234/v1` | LM Studio server URL |
-| `MODEL_<ROLE>` | `goekdenizguelmez/JOSIEFIED-Qwen3:8b` etc. | Ollama model tag per role — override via `.env` (see `.env.example` for recommended values) |
-| `LMSTUDIO_MODEL_<ROLE>` | same as above | LM Studio model ID per role — override via `.env` (see `.env.example` for recommended values) |
+| `MODEL` | unset | Global model fallback for all roles (e.g. `qwen2.5-coder:14b`) |
+| `MODEL_<ROLE>` | role spec | Ollama model tag per role — override via `.env` (Option A) |
+| `LMSTUDIO_MODEL_<ROLE>` | role spec | LM Studio model ID per role — override via `.env` |
+| `SHOW_THINKING` | `false` | Display real-time agent thinking panels in console (`true` / `false`) |
+| `MODEL_THINKING` | `false` | Enable LLM model internal reasoning generation (`true` / `false`) |
 | `LLM_MAX_CONCURRENCY` | `2` | Max concurrent LLM calls (raise for high-RAM setups) |
 | `MULTI_AGENT_LLM_DATA_DIR` | `~/.multi-agent-llm-company-system` | Internal data dir (logs, memory, reports) |
 | `COMPANY_AGI_OUTPUT_DIR` | `output/solutions` | Generated code output directory |

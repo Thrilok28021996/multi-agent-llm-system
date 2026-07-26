@@ -9,7 +9,7 @@ pyproject.toml is correctly configured.
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import List
 
 
 class ProjectNamingChecker:
@@ -225,7 +225,7 @@ class ProjectNamingChecker:
         # Not "multi-agent-llm-company-system" since that's just the package name
         
         for py_file in self.root.glob('**/*.py'):
-            if any(part.startswith('.') for part in py_file.parts):
+            if py_file.name == 'check_project_naming.py' or any(part.startswith('.') for part in py_file.parts):
                 continue
             
             try:

@@ -13,7 +13,7 @@ Validates markdown files for:
 import re
 import sys
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import List
 
 
 class MarkdownChecker:

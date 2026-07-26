@@ -157,10 +157,18 @@ class ModelConfig:
         import os
         self.configs = MODEL_CONFIGS.copy()
 
+        # Global model override fallback (e.g. MODEL=qwen2.5:latest in .env)
+        global_model = (
+            os.getenv("MODEL")
+            or os.getenv("DEFAULT_MODEL")
+            or os.getenv("OLLAMA_MODEL")
+            or os.getenv("LLM_MODEL")
+        )
+
         # Apply env var overrides
         for role, suffix in self._ROLE_ENV.items():
-            ollama_override = os.getenv(f"MODEL_{suffix}")
-            lmstudio_override = os.getenv(f"LMSTUDIO_MODEL_{suffix}")
+            ollama_override = os.getenv(f"MODEL_{suffix}") or global_model
+            lmstudio_override = os.getenv(f"LMSTUDIO_MODEL_{suffix}") or global_model
             if ollama_override or lmstudio_override:
                 spec = self.configs[role]
                 self.configs[role] = ModelSpec(

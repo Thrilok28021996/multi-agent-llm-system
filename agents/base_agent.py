@@ -1020,7 +1020,7 @@ COGNITIVE DISCIPLINE:
                         operation="chat",
                         duration_ms=(time.time() - t0) * 1000,
                     )
-                return text
+                return console._clean_llm_output(text)
 
             except FileNotFoundError as e:
                 raise LLMModelNotFoundError(str(e))
@@ -1068,7 +1068,7 @@ COGNITIVE DISCIPLINE:
                     operation="chat_stream",
                     duration_ms=(time.time() - t0) * 1000,
                 )
-            return full_response
+            return console._clean_llm_output(full_response)
         except FileNotFoundError as e:
             raise LLMModelNotFoundError(str(e))
         except ConnectionError as e:

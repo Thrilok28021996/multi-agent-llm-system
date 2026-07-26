@@ -3266,7 +3266,7 @@ Code Execution Results: {execution_summary}{confidence_note}{cto_peer_note}
                 )
             else:
                 brief = await self.ceo.generate_response_async(brief_prompt, use_first_principles=False)
-            brief = brief.strip()
+            brief = console._clean_llm_output(brief)
             self.state.artifacts["ceo_morning_brief"] = brief
             console.info(f"CEO Morning Brief:\n{brief}")
             # Inject brief into all agent system prompts for this run

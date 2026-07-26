@@ -9,7 +9,7 @@ Run this as part of CI/CD to ensure naming standards are maintained.
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 
 class ConsistencyChecker:
